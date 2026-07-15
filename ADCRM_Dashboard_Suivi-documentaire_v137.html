@@ -23699,7 +23699,7 @@ console.info('[V142] Progression, état prêt, étape suivante et bouton Génér
 (function(){
     if(window.__v148DirectFastExportsInstalled)return;
     window.__v148DirectFastExportsInstalled=true;
-    window.__CFL_IMMO_DASHBOARD_VERSION__='V174';
+    window.__CFL_IMMO_DASHBOARD_VERSION__='V175';
 
     const XLSX_URL='https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js';
     const JSZIP_URL='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
@@ -23734,7 +23734,7 @@ console.info('[V142] Progression, état prêt, étape suivante et bouton Génér
     function toast(message,type){try{if(typeof window.showToast==='function')window.showToast(message,type||'info');}catch(e){}}
     function clearBusy(){document.querySelectorAll('button[aria-busy="true"]').forEach(btn=>{btn.removeAttribute('aria-busy');btn.classList.remove('v146-export-button-busy');btn.disabled=false;});}
     function safeProject(){let v='Projet';try{if(typeof activeProject!=='undefined'&&activeProject)v=activeProject;else if(window.activeProject)v=window.activeProject;}catch(e){}const el=document.getElementById('project-selector');if((!v||v==='Projet')&&el&&el.value)v=el.value;return String(v||'Projet').replace(/[\\/:*?"<>|]/g,'-').trim()||'Projet';}
-    function stamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;}
+    function stamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;}
     function allRows(){
         try{if(typeof processedData!=='undefined'&&Array.isArray(processedData))return processedData;}catch(e){}
         try{if(Array.isArray(window.processedData))return window.processedData;}catch(e){}
@@ -24373,10 +24373,10 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
         finally{running=false;clearBusy();}
     }
 
-    const exportExe=()=>runExport({label:'EXE/BPE',title:'CFL immo — EXE/BPE',scope:'EXE',rows:allRows,coverType:'complete',structured:'exe',filename:()=>`${safeProject()}_EXE-BPE_${stamp()}.xlsx`});
-    const exportChan=()=>runExport({label:'CHANTIER',title:'CFL immo — CHANTIER',scope:'CHAN',rows:allRows,coverType:'complete',structured:'chantier',filename:()=>`${safeProject()}_CHANTIER_${stamp()}.xlsx`});
-    const exportTree=()=>runExport({label:'Export Excel Arborescence',title:'CFL immo — Arborescence documentaire groupée — Autodesk Forma - Data Management',rows:allRows,tree:true,coverType:'tree',sheetName:'Arborescence ACC',tabColor:'00B0F0',filename:()=>`${safeProject()}_Export_Arborescence_Groupee_${stamp()}.xlsx`});
-    const exportFiltered=()=>runExport({label:'Export filtré EXE/BPE + Chantier',title:'CFL immo — Export filtré structuré EXE/BPE + Chantier — Autodesk Forma - Data Management',rows:filteredRows,onlyOperational:true,coverType:'complete',structured:'filtered',filename:()=>`${safeProject()}_Export_Filtre_Structure_EXE_BPE_Chantier_${stamp()}.xlsx`});
+    const exportExe=()=>runExport({label:'EXE/BPE',title:'CFL immo — EXE/BPE',scope:'EXE',rows:allRows,coverType:'complete',structured:'exe',filename:()=>`${safeProject()}_Export_EXE_Autodesk_Forma_Data_Management_${stamp()}.xlsx`});
+    const exportChan=()=>runExport({label:'CHANTIER',title:'CFL immo — CHANTIER',scope:'CHAN',rows:allRows,coverType:'complete',structured:'chantier',filename:()=>`${safeProject()}_Export_CHA_Autodesk_Forma_Data_Management_${stamp()}.xlsx`});
+    const exportTree=()=>runExport({label:'Export Excel Arborescence',title:'CFL immo — Arborescence documentaire groupée — Autodesk Forma - Data Management',rows:allRows,tree:true,coverType:'tree',sheetName:'Arborescence ACC',tabColor:'00B0F0',filename:()=>`${safeProject()}_Export_Arborescence_Autodesk_Forma_Data_Management_${stamp()}.xlsx`});
+    const exportFiltered=()=>runExport({label:'Export filtré EXE/BPE + Chantier',title:'CFL immo — Export filtré structuré EXE/BPE + Chantier — Autodesk Forma - Data Management',rows:filteredRows,onlyOperational:true,coverType:'complete',structured:'filtered',filename:()=>`${safeProject()}_Export_Filtré-EXE-BPE-CHA_Autodesk_Forma_Data_Management_${stamp()}.xlsx`});
     const flags=['__v107Wrapped','__v108Wrapped','__v109Wrapped','__v110Wrapped','__v111Wrapped','__v112Wrapped','__v114Wrapped','__v115Wrapped','__v117WorkflowWrapped','__v119ProgressWrapped','__v126StrictWrapped','__v128Fast','__v137OverdueHook','__v148Direct','__v151Structured'];
     [exportExe,exportChan,exportTree,exportFiltered].forEach(fn=>flags.forEach(f=>fn[f]=true));
 
@@ -24392,7 +24392,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
         document.querySelectorAll('button[onclick*="exportChantierExcel"]').forEach(b=>{b.title='CHANTIER V157 — uniquement les fichiers physiquement placés sous 07_Chantier, avec priorité aux lots précis dont le lot 3.3.';setButtonLabel(b,'CHANTIER');});
         document.querySelectorAll('button[onclick*="exportACCArborescenceExcel"]').forEach(b=>b.title='Arborescence V157 — dossiers hiérarchiques colorés et niveaux Excel repliables.');
         document.querySelectorAll('button[onclick*="exportFilteredExeBpeChantierExcel"]').forEach(b=>b.title='Export filtré V174 — onglets EXE/BPE et Chantier concernés uniquement, avec dossiers et sous-dossiers groupés et repliables.');
-        try{document.title=document.title.replace(/V\d+/i,'V174');}catch(e){}
+        try{document.title=document.title.replace(/V\d+/i,'V175');}catch(e){}
     }
     install();document.addEventListener('DOMContentLoaded',()=>{setTimeout(install,120);setTimeout(install,950);setTimeout(install,3300);});setTimeout(install,3100);
     console.info('[V173] Chantier : les sous-dossiers LOT0/LOT1 restent sous leur lot parent ; 03_TSPE conserve l’exception 3.1/3.3.');
@@ -25879,7 +25879,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     const wrapped=function(){const out=previousUpdate.apply(this,arguments);queue();return out;};wrapped.__v171Single=true;window.updatePageDeGarde=wrapped;try{updatePageDeGarde=wrapped;}catch(e){}
   }
   let timer=0;function queue(){clearTimeout(timer);timer=setTimeout(render,20);}
-  function install(){buildGrid();render();try{document.title=document.title.replace(/V\d+/i,'V174');}catch(e){}}
+  function install(){buildGrid();render();try{document.title=document.title.replace(/V\d+/i,'V175');}catch(e){}}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setTimeout(install,80);setTimeout(install,1200);});else setTimeout(install,50);
   setTimeout(install,3000);
   console.info('[V171] Purge KPI effectuée : un seul moteur calcule et affiche les indicateurs documentaires.');
@@ -25896,16 +25896,16 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
 
 <script id="v174-filtered-structured-export-marker">
 (function(){
-  window.__CFL_IMMO_DASHBOARD_VERSION__='V174';
+  window.__CFL_IMMO_DASHBOARD_VERSION__='V175';
   function refresh(){
     document.querySelectorAll('button[onclick*="exportFilteredExeBpeChantierExcel"]').forEach(function(btn){
       btn.title='Export filtré V174 — uniquement les onglets concernés, classés et groupés comme les exports EXE/BPE et Chantier.';
     });
-    try{document.title=document.title.replace(/V\d+/i,'V174');}catch(e){}
+    try{document.title=document.title.replace(/V\d+/i,'V175');}catch(e){}
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refresh);else refresh();
   setTimeout(refresh,1200);
-  console.info('[V174] Export filtré structuré : onglets concernés uniquement, hiérarchie groupée, aucun onglet vide.');
+  console.info('[V175] Export filtré structuré : onglets concernés uniquement, hiérarchie groupée, aucun onglet vide.');
 })();
 </script>
 
