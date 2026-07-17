@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CFLImmo - Dashboard Documentaire - V207</title>
+    <title>CFLImmo - Dashboard Documentaire - V208</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com">
 
@@ -26531,7 +26531,7 @@ self.onmessage=async function(ev){
 (function(){
     if(window.__v207FinalExportsInstalled)return;
     window.__v207FinalExportsInstalled=true;
-    window.__CFL_IMMO_DASHBOARD_VERSION__='V207';
+    window.__CFL_IMMO_DASHBOARD_VERSION__='V208';
 
     const XLSX_URL='https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js';
     const JSZIP_URL='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
@@ -27478,7 +27478,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   });
 
   window.__V207_RUNTIME_MANIFEST__=Object.freeze({
-    version:'V207',
+    version:'V208',
     exportEngine:'v207-final-export-engine',
     authorEngine:'v185-exhaustive-author-mapping + v189-strict-author-validation',
     filterEngine:'v167-filter-engine',
@@ -27489,7 +27489,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   });
 
   function finalizeUi(){
-    try{document.title='CFLImmo - Dashboard Documentaire - V207';}catch(e){}
+    try{document.title='CFLImmo - Dashboard Documentaire - V208';}catch(e){}
     document.documentElement.setAttribute('data-dashboard-version','V207');
     document.querySelectorAll('button[onclick*="exportExeExcel"]').forEach(b=>b.title='EXE/BPE — moteur final V207');
     document.querySelectorAll('button[onclick*="exportChantierExcel"]').forEach(b=>b.title='CHANTIER — moteur final V207');
@@ -27499,6 +27499,142 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   finalizeUi();
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',finalizeUi,{once:true});
   console.info('[V207] Purge finale active : moteur export unique verrouillé, mappings consolidés, réinstalleurs périodiques supprimés.');
+})();
+</script>
+
+
+<script id="v208-active-step-blocking-roles-fix">
+(function(){
+  if(window.__v208ActiveStepBlockingRolesFix)return;
+  window.__v208ActiveStepBlockingRolesFix=true;
+  window.__CFL_IMMO_DASHBOARD_VERSION__='V208';
+
+  function norm(v){
+    return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[’']/g,' ').replace(/[^A-Z0-9.]+/g,' ').replace(/\s+/g,' ').trim();
+  }
+  function sourceStep(wf){ return String((wf&&wf.step)||'').trim(); }
+  function currentStepLabel(wf){
+    var raw=sourceStep(wf);
+    // Les parenthèses ACC décrivent parfois la provenance de la transition,
+    // par ex. "Initial Review (Renvoyé à partir de l'étape Final Review)".
+    // Elles ne décrivent pas l'étape active.
+    return raw.split('(')[0].trim();
+  }
+  function explicitInitiatorState(wf){
+    var txt=norm([
+      wf&&wf.step,
+      wf&&wf.activeText,
+      wf&&wf.globStat
+    ].filter(Boolean).join(' '));
+    if(!txt)return false;
+    return /(CHEZ L INITIATEUR|CHEZ INITIATEUR|EN ATTENTE DE L INITIATEUR|EN ATTENTE INITIATEUR|RENVOYE A L INITIATEUR|RETOURNE A L INITIATEUR|RETOUR CHEZ L INITIATEUR|WAITING FOR INITIATOR|RETURNED TO INITIATOR|BACK TO INITIATOR|BEIM INITIATOR|WARTET AUF INITIATOR|WARTEN AUF INITIATOR|CHEZ L EMETTEUR|EN ATTENTE DE L EMETTEUR|RETURNED TO SENDER)/.test(txt);
+  }
+
+  // V208 : ne plus assimiler tout mot "renvoyé / retour / correction" à un blocage initiateur.
+  // "Initial Review (Renvoyé à partir de l'étape Final Review)" signifie que l'étape active
+  // est Initial Review : les réviseurs de l'étape 1 sont donc les bloqueurs potentiels.
+  window.isWorkflowReturnedToInitiator = isWorkflowReturnedToInitiator = function(wf){
+    return explicitInitiatorState(wf||{});
+  };
+  window.isWorkflowWaitingForInitiator = isWorkflowWaitingForInitiator = function(wf){
+    wf=wf||{};
+    var state=[wf.globStat,wf.step,wf.activeText].filter(Boolean).join(' ');
+    try{
+      if(typeof isWorkflowClosedStatus==='function'&&isWorkflowClosedStatus(state))return false;
+      if(typeof isWorkflowInvalidStatus==='function'&&isWorkflowInvalidStatus(state))return false;
+    }catch(e){}
+    return explicitInitiatorState(wf);
+  };
+
+  window.isWorkflowAtFinalApprovalStep = isWorkflowAtFinalApprovalStep = function(wf){
+    wf=wf||{};
+    var main=norm(currentStepLabel(wf));
+    // Priorité absolue au libellé de l'étape active situé avant la parenthèse.
+    if(/(^| )(1|01)($| )/.test(main)||/(INITIAL REVIEW|REVUE INITIALE|ETAPE 1|STEP 1|PREMIERE REVUE)/.test(main))return false;
+    if(/(^| )(2|02)($| )/.test(main)||/(FINAL REVIEW|REVUE FINALE|FINAL APPROVAL|APPROBATION FINALE|ETAPE 2|STEP 2)/.test(main))return true;
+    var finalApprover='';
+    try{ finalApprover=typeof normalizeRoleCode==='function'?normalizeRoleCode(wf.finalApprover||wf.finalApproverFromName||wf.apprCalculated||wf.appr||''):''; }catch(e){}
+    if(finalApprover&&new RegExp('(^| )'+finalApprover+'( |$)').test(main))return true;
+    return false;
+  };
+
+  var baseFinalize=(typeof finalizeWorkflowRoleInfo==='function')?finalizeWorkflowRoleInfo:null;
+  function suspicious(wf){
+    if(!wf)return false;
+    var main=norm(currentStepLabel(wf));
+    var blocked=String(wf.rolesBlkCalculated||wf.rolesBlk||'');
+    return /(INITIAL REVIEW|REVUE INITIALE|ETAPE 1|STEP 1)/.test(main)
+      && (/^\s*EN\s*\d/i.test(blocked)||/INITIATEUR/i.test(blocked)||/MOG\s*-?\s*MANDATAIRE/i.test(blocked));
+  }
+  if(baseFinalize){
+    window.finalizeWorkflowRoleInfo = finalizeWorkflowRoleInfo = function(wf){
+      if(wf&&suspicious(wf)){
+        try{delete wf.__finalizedCacheKey;}catch(e){wf.__finalizedCacheKey='';}
+      }
+      return baseFinalize(wf);
+    };
+  }
+
+  function refreshRow(row){
+    if(!row||!row.wfData||!baseFinalize)return false;
+    var wf=row.wfData;
+    var main=norm(currentStepLabel(wf));
+    if(!/(INITIAL REVIEW|REVUE INITIALE|ETAPE 1|STEP 1)/.test(main)&&!suspicious(wf))return false;
+    try{delete wf.__finalizedCacheKey;}catch(e){wf.__finalizedCacheKey='';}
+    baseFinalize(wf);
+    try{row.extractedRolesReq=(typeof formatRoleListForOutput==='function')?formatRoleListForOutput(wf.rolesReqCalculated||''):(wf.rolesReqCalculated||'');}catch(e){row.extractedRolesReq=wf.rolesReqCalculated||'';}
+    try{row.extractedRolesBlk=(typeof formatRoleListForOutput==='function')?formatRoleListForOutput(wf.rolesBlkCalculated||''):(wf.rolesBlkCalculated||'');}catch(e){row.extractedRolesBlk=wf.rolesBlkCalculated||'';}
+    row.extractedRolesBlkDetails=wf.rolesBlkDetails||'';
+    row.extractedRoleAnalysisStatus=wf.roleAnalysisStatus||'';
+    row.extractedFinalApprover=wf.apprCalculated||wf.finalApprover||row.extractedFinalApprover||'';
+    return true;
+  }
+  function refreshExistingRows(redraw){
+    var seen=new Set(),changed=0;
+    var lists=[];
+    try{if(typeof processedData!=='undefined'&&Array.isArray(processedData))lists.push(processedData);}catch(e){}
+    try{if(typeof filteredData!=='undefined'&&Array.isArray(filteredData))lists.push(filteredData);}catch(e){}
+    lists.forEach(function(list){list.forEach(function(row){if(!row||seen.has(row))return;seen.add(row);if(refreshRow(row))changed++;});});
+    if(changed&&redraw){
+      try{if(typeof renderTableData==='function')renderTableData();}catch(e){}
+      try{if(typeof updatePageDeGarde==='function')updatePageDeGarde();}catch(e){}
+    }
+    return changed;
+  }
+  window.v208RefreshBlockingRoles=refreshExistingRows;
+
+  // Après chaque consolidation, recalcul ciblé des rôles avec la nouvelle règle.
+  try{
+    var oldProcess=window.processAllData||((typeof processAllData==='function')?processAllData:null);
+    if(typeof oldProcess==='function'&&!oldProcess.__v208Wrapped){
+      var wrapped=async function(){
+        var result=await oldProcess.apply(this,arguments);
+        await new Promise(function(resolve){setTimeout(resolve,0);});
+        refreshExistingRows(true);
+        return result;
+      };
+      wrapped.__v208Wrapped=true;
+      window.processAllData=wrapped;
+      try{processAllData=wrapped;}catch(e){}
+    }
+  }catch(e){}
+
+  // Juste avant un export, corriger d'éventuelles données restaurées depuis un ancien cache projet.
+  document.addEventListener('click',function(ev){
+    var btn=ev.target&&ev.target.closest?ev.target.closest('button'):null;
+    if(!btn)return;
+    var oc=String(btn.getAttribute('onclick')||'');
+    if(/exportExeExcel|exportChantierExcel|exportACCArborescenceExcel|exportFilteredExeBpeChantierExcel/.test(oc))refreshExistingRows(false);
+  },true);
+
+  function ui(){
+    try{document.title='CFLImmo - Dashboard Documentaire - V208';}catch(e){}
+    document.documentElement.setAttribute('data-dashboard-version','V208');
+  }
+  ui();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){ui();setTimeout(function(){refreshExistingRows(true);},300);},{once:true});
+  else setTimeout(function(){refreshExistingRows(true);},100);
+  console.info('[V208] Rôles bloquants corrigés : la provenance "Renvoyé à partir de Final Review" ne transforme plus Initial Review en blocage initiateur/final.');
 })();
 </script>
 
