@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CFLImmo - Dashboard Documentaire - V223</title>
+    <title>CFLImmo - Dashboard Documentaire - V224</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com">
 
@@ -1061,7 +1061,7 @@
                         </article>
                     </div>
                     <p class="v211-help">En haut : WF uniques. En bas : fichiers / versions distincts. Même périmètre de WF ouverts et mêmes filtres ; les doublons d’import ne gonflent pas les compteurs. Un WF ou un fichier peut dépendre de plusieurs rôles ou sociétés : les pourcentages ne s’additionnent pas à 100 %. Cliquez sur une barre pour afficher les fichiers concernés.</p>
-                    <p id="v212-company-source-note" class="v211-help">Correspondances lues dans les colonnes Rôle et Société de Membres. ARCH est recherché comme un mot ; Mandataire identifie MOG, pas MOEG_Chef-Projet seul. Si plusieurs sociétés portent un rôle, leurs noms sont regroupés sans imputer le blocage à chacune.</p>
+                    <p id="v212-company-source-note" class="v211-help">Correspondances lues dans les colonnes Rôle et Société de Membres. À défaut : BDC et PMR → OGCE / OGCX, MNB → AREP, MOD → CFLImmo. ARCH est recherché comme un mot ; Mandataire identifie MOG, pas MOEG_Chef-Projet seul.</p>
                 </section>
                 <div id="graph-active-filter" class="hidden bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 text-cyan-800 dark:text-cyan-200 px-4 py-3 rounded-xl text-sm items-center justify-between gap-3">
                     <div class="flex items-center gap-2 min-w-0">
@@ -28274,16 +28274,16 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   'use strict';
   if(window.__v209GlobalWorkflowStatusFilterInstalled)return;
   window.__v209GlobalWorkflowStatusFilterInstalled=true;
-  window.__CFL_IMMO_DASHBOARD_VERSION__='V223';
+  window.__CFL_IMMO_DASHBOARD_VERSION__='V224';
 
   function refresh(){
     try{if(typeof v210RefreshAllRoles==='function')v210RefreshAllRoles();}catch(e){console.warn('[V210] Recalcul des auteurs et rôles',e);}
     try{if(typeof window.v209RefreshGlobalWorkflowStatusFilter==='function')window.v209RefreshGlobalWorkflowStatusFilter();}catch(e){console.warn('[V209] Catalogue Statut global WF',e);}
   }
   function version(){
-    window.__CFL_IMMO_DASHBOARD_VERSION__='V223';
-    try{document.title='CFLImmo - Dashboard Documentaire - V223';}catch(e){}
-    document.documentElement.setAttribute('data-dashboard-version','V223');
+    window.__CFL_IMMO_DASHBOARD_VERSION__='V224';
+    try{document.title='CFLImmo - Dashboard Documentaire - V224';}catch(e){}
+    document.documentElement.setAttribute('data-dashboard-version','V224');
   }
   function installProcessHook(){
     const prior=window.processAllData||((typeof processAllData==='function')?processAllData:null);
@@ -28316,6 +28316,12 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   const first=(...values)=>values.map(clean).find(v=>v&&!/^[-–—]+$/.test(v))||'';
   const number=v=>Number(v||0).toLocaleString('fr-FR');
   const own=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);
+  const CONFIRMED_ROLE_COMPANY_FALLBACKS=new Map([
+    ['BDC',['OGCE','OGCX']],
+    ['MNB',['AREP']],
+    ['PMR',['OGCE','OGCX']],
+    ['MOD',['CFLImmo']]
+  ]);
   let directoryCache=null;
   function allRows(){try{return Array.isArray(processedData)?processedData:[];}catch(e){return window.processedData||[];}}
   function visibleRows(){try{return Array.isArray(filteredData)?filteredData:[];}catch(e){return window.filteredData||[];}}
@@ -28379,9 +28385,15 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
       });
       if(companies.size)source='Index rôles/sociétés importé';
     }
-    const names=[...companies.values()].sort((a,b)=>a.localeCompare(b,'fr'));
+    let names=[...companies.values()].sort((a,b)=>a.localeCompare(b,'fr'));
+    let confirmedFallback=false;
+    if(!names.length&&CONFIRMED_ROLE_COMPANY_FALLBACKS.has(code)){
+      names=CONFIRMED_ROLE_COMPANY_FALLBACKS.get(code).slice();
+      source='Référentiel confirmé intégré';
+      confirmedFallback=true;
+    }
     const groupedArch=code==='ARCH'&&names.length>1;
-    const result=names.length===1||groupedArch?
+    const result=names.length===1||groupedArch||confirmedFallback?
       {label:names.join(' / '),displayLabel:['ARCH','MNB'].includes(code)?names.map(compactCompanyLabel).join(' / '):names.join(' / '),
        uncertain:false,grouped:groupedArch,candidates:names,source}:
       {label:names.length?'Société à confirmer — '+role+' : '+names.join(' / '):'Société non identifiée — '+role,
@@ -28482,7 +28494,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     text('v211-company-total',number(summary.total)+' WF uniques représentés · '+number(summary.companies.length)+' sociétés / attributions');
     text('v212-file-role-total',number(summary.fileCount)+' fichiers / versions distincts · '+number(summary.fileRoles.length)+' rôles');
     text('v212-file-company-total',number(summary.fileCount)+' fichiers / versions distincts · '+number(summary.fileCompanies.length)+' sociétés / attributions');
-    text('v212-company-source-note','Correspondances lues dans les colonnes Rôle et Société de Membres. ARCH est recherché comme un mot ; Mandataire identifie MOG, pas MOEG_Chef-Projet seul. Si plusieurs sociétés portent un rôle, leurs noms sont regroupés sans imputer le blocage à chacune.');
+    text('v212-company-source-note','Correspondances lues dans les colonnes Rôle et Société de Membres. À défaut : BDC et PMR → OGCE / OGCX, MNB → AREP, MOD → CFLImmo. ARCH est recherché comme un mot ; Mandataire identifie MOG, pas MOEG_Chef-Projet seul.');
     const warnings=[];
     if(summary.uncertainCount)warnings.push(number(summary.uncertainCount)+' WF : attribution de société à vérifier dans Membres.');
     summary.conflicts.forEach(message=>warnings.push('À vérifier : '+message+'.'));
