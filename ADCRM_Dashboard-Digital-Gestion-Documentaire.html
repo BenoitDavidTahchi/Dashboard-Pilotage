@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CFLImmo - Dashboard Documentaire - V224</title>
+    <title>CFLImmo - Dashboard Documentaire - V226</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com">
 
@@ -550,7 +550,7 @@
                             Projet: 
                             <select id="project-selector" onchange="handleProjectChange(this.value)" class="ml-2 bg-slate-800 text-white border border-slate-600 rounded px-2 py-0.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer appearance-none outline-none custom-select relative" style="background-image: url('data:image/svg+xml;utf8,<svg fill=%22white%22 height=%2224%22 viewBox=%220 0 24 24%22 width=%2224%22 xmlns=%22http://www.w3.org/2000/svg%22><path d=%22M7 10l5 5 5-5z%22/><path d=%22M0 0h24v24H0z%22 fill=%22none%22/></svg>'); background-repeat: no-repeat; background-position-x: 100%; background-position-y: center; padding-right: 28px;">
                                 <option value="ADCRM">ADCRM - Bâtiment administratif</option>
-                                <option value="DEPB5">DEPB5 - Bâtiment administratif (Ilot B5)</option>
+                                <option value="DEPB5">DEPB5 - Dépollution (Îlot B5)</option>
                                 <option value="CENFO">CENFO - Centre de formation</option>
                             </select>
                         </h1>
@@ -1701,9 +1701,48 @@
         // --- ETAT GLOBAL MULTI-PROJETS ---
         const PROJECT_NAMES = {
             'ADCRM': 'ADCRM - Bâtiment administratif',
-            'DEPB5': 'DEPB5 - Bâtiment administratif (Ilot B5)',
+            'DEPB5': 'DEPB5 - Dépollution (Îlot B5)',
             'CENFO': 'CENFO - Centre de formation'
         };
+
+        // V225 — Les règles métier qui varient réellement d'un projet sont isolées ici.
+        // Les imports Membres restent prioritaires : ces correspondances servent seulement
+        // de référentiel confirmé lorsqu'aucune association explicite n'est disponible.
+        const PROJECT_RULE_PROFILES = {
+            ADCRM: {
+                languages: ['FR', 'EN', 'DE'],
+                initiatorCompanyByLot: {
+                    '00': 'EN00 - PARKING PROVISOIRE - (TRALUX)',
+                    '01': 'EN01 - TERRASSEMENT & BLINDAGE - (BAATZ)',
+                    '2.1': 'EN2.1 Gros-Oeuvre - (CLE-CBL)',
+                    '2.2': 'EN2.2 - Clos & Couvert - (SCHNIDER)',
+                    '3.1': 'EN3.1 - TSPE - (GENISTA)',
+                    '3.3': 'EN3.3 - ASCENSEURS - (BEIL)'
+                },
+                roleCompanyFallbacks: {
+                    BDC: ['OGCE', 'OGCX'],
+                    MNB: ['AREP'],
+                    PMR: ['OGCE', 'OGCX']
+                }
+            },
+            DEPB5: {
+                languages: ['FR', 'EN', 'DE'],
+                initiatorCompanyByLot: {
+                    '00': 'EN00 - DÉPOLLUTION - (BALT)',
+                    '01': 'EN01 - TERRASSEMENT & BLINDAGE - (BAAT)',
+                    '2': 'EN02 - GROS ŒUVRE - (GALR)',
+                    '4': 'EN04 - TECHNIQUES SPÉCIALES - (MESO)'
+                },
+                tenderLots: ['03', '04.1', '05'],
+                roleCompanyFallbacks: {}
+            },
+            CENFO: {
+                languages: ['FR', 'EN', 'DE'],
+                initiatorCompanyByLot: {},
+                roleCompanyFallbacks: {}
+            }
+        };
+        window.PROJECT_RULE_PROFILES = PROJECT_RULE_PROFILES;
 
         let activeProject = 'ADCRM';
         window.membersByNameCompany = new Map();
@@ -1927,15 +1966,6 @@
 
         // V81 — Cas "OUVERT chez l'initiateur" : le rôle bloquant n'est pas un réviseur,
         // mais l'entreprise initiatrice du lot, déduite du préfixe du nom de WF.
-        const INITIATOR_COMPANY_BY_WORKFLOW_LOT = {
-            '00': 'EN00 - PARKING PROVISOIRE - (TRALUX)',
-            '01': 'EN01 - TERRASSEMENT & BLINDAGE - (BAATZ)',
-            '2.1': 'EN2.1 Gros-Oeuvre - (CLE-CBL)',
-            '2.2': 'EN2.2 - Clos & Couvert - (SCHNIDER)',
-            '3.1': 'EN3.1 - TSPE - (GENISTA)',
-            '3.3': 'EN3.3 - ASCENSEURS - (BEIL)'
-        };
-
         function extractWorkflowLotCode(wfName) {
             const compact = String(wfName || '').trim().replace(/\s+/g, '').toUpperCase();
             const m = compact.match(/(?:^|_)LOT([0-9]{1,2}(?:[._][0-9])?)/i);
@@ -1948,7 +1978,23 @@
 
         function getInitiatorCompanyFromWorkflowName(wfName) {
             const lotCode = extractWorkflowLotCode(wfName);
-            return INITIATOR_COMPANY_BY_WORKFLOW_LOT[lotCode] || '';
+            let projectCode = '';
+            try { projectCode = String(activeProject || '').trim().toUpperCase(); }
+            catch (e) { projectCode = String(window.activeProject || 'ADCRM').trim().toUpperCase(); }
+            const profiles = (typeof PROJECT_RULE_PROFILES !== 'undefined' && PROJECT_RULE_PROFILES) || window.PROJECT_RULE_PROFILES || {};
+            const profile = profiles[projectCode] || {};
+            const mapping = profile.initiatorCompanyByLot || {};
+            if (mapping[lotCode]) return mapping[lotCode];
+            // Compatibilité des exports autonomes plus anciens qui ne contiennent pas encore le profil.
+            if (projectCode === 'ADCRM') return ({
+                '00': 'EN00 - PARKING PROVISOIRE - (TRALUX)',
+                '01': 'EN01 - TERRASSEMENT & BLINDAGE - (BAATZ)',
+                '2.1': 'EN2.1 Gros-Oeuvre - (CLE-CBL)',
+                '2.2': 'EN2.2 - Clos & Couvert - (SCHNIDER)',
+                '3.1': 'EN3.1 - TSPE - (GENISTA)',
+                '3.3': 'EN3.3 - ASCENSEURS - (BEIL)'
+            })[lotCode] || '';
+            return '';
         }
 
         function isWorkflowWaitingForInitiator(wfObj) {
@@ -2689,7 +2735,11 @@
 
         function workflowFinalizeCacheKey(wfObj) {
             wfObj = wfObj || {};
+            let activeProjectKey = '';
+            try { activeProjectKey = String(activeProject || '').toUpperCase(); }
+            catch (e) { activeProjectKey = String(window.activeProject || 'ADCRM').toUpperCase(); }
             return [
+                activeProjectKey,
                 window.__membersVersion || 0,
                 String(wfObj.wfName || wfObj.name || ''),
                 String(wfObj.globStat || ''),
@@ -2979,6 +3029,66 @@
             return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000);
         }
 
+        // V226 — Retard contractuel en jours ouvrés Luxembourg : lundi à vendredi,
+        // hors jours fériés légaux. L'échéance est J0 ; la borne de fin est incluse.
+        const v226LuxHolidayCache = new Map();
+        function v226UtcDateKey(year, monthIndex, day) {
+            return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+        function v226EasterSundayUtc(year) {
+            const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+            const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+            const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+            const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+            const m = Math.floor((a + 11 * h + 22 * l) / 451);
+            const month = Math.floor((h + l - 7 * m + 114) / 31) - 1;
+            const day = ((h + l - 7 * m + 114) % 31) + 1;
+            return new Date(Date.UTC(year, month, day, 12));
+        }
+        function v226LuxembourgHolidayKeys(year) {
+            if (v226LuxHolidayCache.has(year)) return v226LuxHolidayCache.get(year);
+            const keys = new Set([
+                v226UtcDateKey(year, 0, 1),   // Nouvel An
+                v226UtcDateKey(year, 4, 1),   // Fête du Travail
+                v226UtcDateKey(year, 4, 9),   // Journée de l'Europe
+                v226UtcDateKey(year, 5, 23),  // Fête nationale
+                v226UtcDateKey(year, 7, 15),  // Assomption
+                v226UtcDateKey(year, 10, 1),  // Toussaint
+                v226UtcDateKey(year, 11, 25), // Noël
+                v226UtcDateKey(year, 11, 26)  // Saint-Étienne
+            ]);
+            const easter = v226EasterSundayUtc(year);
+            [1, 39, 50].forEach(offset => {
+                const movable = new Date(easter.getTime());
+                movable.setUTCDate(movable.getUTCDate() + offset);
+                keys.add(v226UtcDateKey(movable.getUTCFullYear(), movable.getUTCMonth(), movable.getUTCDate()));
+            });
+            v226LuxHolidayCache.set(year, keys);
+            return keys;
+        }
+        function v226IsLuxembourgWorkingDay(date) {
+            const weekday = date.getUTCDay();
+            if (weekday === 0 || weekday === 6) return false;
+            const key = v226UtcDateKey(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+            return !v226LuxembourgHolidayKeys(date.getUTCFullYear()).has(key);
+        }
+        function v226WorkingDaysBetween(startTimestamp, endTimestamp) {
+            const start = new Date(startTimestamp), end = new Date(endTimestamp);
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+            const startDay = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate(), 12);
+            const endDay = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate(), 12);
+            if (endDay <= startDay) return 0;
+            let count = 0;
+            const cursor = new Date(startDay);
+            cursor.setUTCDate(cursor.getUTCDate() + 1);
+            while (cursor.getTime() <= endDay) {
+                if (v226IsLuxembourgWorkingDay(cursor)) count++;
+                cursor.setUTCDate(cursor.getUTCDate() + 1);
+            }
+            return count;
+        }
+        window.v226WorkingDaysBetween = v226WorkingDaysBetween;
+
         function v215WorkflowDatesForRow(row, nowValue) {
             row = row || {};
             const wf = row.wfData || {};
@@ -2996,10 +3106,10 @@
             let delayDays = null, delayState = 'unavailable';
             if (workflowId && !unsafe && !invalid && dueTs) {
                 if (closedTs) {
-                    delayDays = Math.max(0, v215CalendarDayNumber(closedTs) - v215CalendarDayNumber(dueTs));
+                    delayDays = v226WorkingDaysBetween(dueTs, closedTs);
                     delayState = delayDays > 0 ? 'closed-late' : 'on-time';
                 } else if (!closedState) {
-                    delayDays = Math.max(0, v215CalendarDayNumber(nowTs) - v215CalendarDayNumber(dueTs));
+                    delayDays = v226WorkingDaysBetween(dueTs, nowTs);
                     delayState = delayDays > 0 ? 'open-late' : 'on-time';
                 }
             }
@@ -3036,7 +3146,7 @@
             { id: 'wfName', label: 'Nom WF', width: 260, align: 'left', filterType: 'wfname' },
             { id: 'wfInitiated', label: 'Date d’initiation WF', width: 145, align: 'center', filterType: 'search' },
             { id: 'wfDue', label: 'Date d’échéance WF', width: 145, align: 'center', filterType: 'search' },
-            { id: 'wfDelay', label: 'Retard (jours)', width: 105, align: 'center', filterType: 'search' },
+            { id: 'wfDelay', label: 'Retard (j ouvrés)', width: 120, align: 'center', filterType: 'search' },
             { id: 'wfRolesReq', label: 'Rôles oblig.', width: 135, align: 'left', filterType: 'search' },
             { id: 'wfRolesBlk', label: 'Rôles bloquants', width: 145, align: 'left', filterType: 'search' },
             { id: 'wfApprover', label: 'Approb. final', width: 90, align: 'center', filterType: 'search' },
@@ -5899,9 +6009,9 @@
                         case 'wfDelay':
                             filterVal = wfDates.delayDays === null ? '-' : String(wfDates.delayDays);
                             if (wfDates.delayDays === null) content = `<span class="text-[9px] text-slate-400" title="Retard non calculable : échéance ou état du WF indisponible">-</span>`;
-                            else if (wfDates.delayState === 'open-late') content = `<span class="px-2 py-0.5 rounded bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700 text-red-800 dark:text-red-200 text-[10px] font-extrabold" title="WF ouvert en retard de ${wfDates.delayDays} jours calendaires">+${wfDates.delayDays} j</span>`;
-                            else if (wfDates.delayState === 'closed-late') content = `<span class="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 text-[10px] font-bold" title="WF clôturé avec ${wfDates.delayDays} jours calendaires de retard">+${wfDates.delayDays} j</span>`;
-                            else content = `<span class="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[9px] font-bold" title="WF dans le délai">0 j</span>`;
+                            else if (wfDates.delayState === 'open-late') content = `<span class="px-2 py-0.5 rounded bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700 text-red-800 dark:text-red-200 text-[10px] font-extrabold" title="WF ouvert en retard de ${wfDates.delayDays} jours ouvrés Luxembourg (hors week-ends et jours fériés légaux)">+${wfDates.delayDays} j ouvrés</span>`;
+                            else if (wfDates.delayState === 'closed-late') content = `<span class="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 text-[10px] font-bold" title="WF clôturé avec ${wfDates.delayDays} jours ouvrés Luxembourg de retard">+${wfDates.delayDays} j ouvrés</span>`;
+                            else content = `<span class="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[9px] font-bold" title="WF dans le délai — calcul en jours ouvrés Luxembourg">0 j ouvré</span>`;
                             break;
                         case 'wfRolesReq':
                             if (rolesReq !== '-') {
@@ -28274,16 +28384,16 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   'use strict';
   if(window.__v209GlobalWorkflowStatusFilterInstalled)return;
   window.__v209GlobalWorkflowStatusFilterInstalled=true;
-  window.__CFL_IMMO_DASHBOARD_VERSION__='V224';
+  window.__CFL_IMMO_DASHBOARD_VERSION__='V226';
 
   function refresh(){
     try{if(typeof v210RefreshAllRoles==='function')v210RefreshAllRoles();}catch(e){console.warn('[V210] Recalcul des auteurs et rôles',e);}
     try{if(typeof window.v209RefreshGlobalWorkflowStatusFilter==='function')window.v209RefreshGlobalWorkflowStatusFilter();}catch(e){console.warn('[V209] Catalogue Statut global WF',e);}
   }
   function version(){
-    window.__CFL_IMMO_DASHBOARD_VERSION__='V224';
-    try{document.title='CFLImmo - Dashboard Documentaire - V224';}catch(e){}
-    document.documentElement.setAttribute('data-dashboard-version','V224');
+    window.__CFL_IMMO_DASHBOARD_VERSION__='V226';
+    try{document.title='CFLImmo - Dashboard Documentaire - V226';}catch(e){}
+    document.documentElement.setAttribute('data-dashboard-version','V226');
   }
   function installProcessHook(){
     const prior=window.processAllData||((typeof processAllData==='function')?processAllData:null);
@@ -28316,10 +28426,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   const first=(...values)=>values.map(clean).find(v=>v&&!/^[-–—]+$/.test(v))||'';
   const number=v=>Number(v||0).toLocaleString('fr-FR');
   const own=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);
-  const CONFIRMED_ROLE_COMPANY_FALLBACKS=new Map([
-    ['BDC',['OGCE','OGCX']],
-    ['MNB',['AREP']],
-    ['PMR',['OGCE','OGCX']],
+  const GLOBAL_ROLE_COMPANY_FALLBACKS=new Map([
     ['MOD',['CFLImmo']]
   ]);
   let directoryCache=null;
@@ -28345,7 +28452,35 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     const value=own(row,'extractedRolesBlk')?row.extractedRolesBlk:first(wf.rolesBlkCalculated,wf.rolesBlk,row&&row['Rôles Bloquants']);
     return [...new Set(clean(value).split(/[,;|\n]+/).map(clean).filter(v=>v&&!/^[-–—]+$/.test(v)&&!/^(aucun|none)$/i.test(v)))];
   }
-  function roleCode(role){return /^MOG\s*[-–]/i.test(role)?'MOG':(typeof normalizeRoleCode==='function'?normalizeRoleCode(role):norm(role));}
+  function projectCode(){
+    try{return clean(activeProject).toUpperCase()||'ADCRM';}catch(e){return clean(window.activeProject||'ADCRM').toUpperCase();}
+  }
+  function roleCode(role){
+    const initiator=clean(role).match(/^EN\s*([0-9]+(?:[._][0-9]+)?)/i);
+    if(initiator)return 'EN'+initiator[1].replace('_','.');
+    return /^MOG\s*[-–]/i.test(role)?'MOG':(typeof normalizeRoleCode==='function'?normalizeRoleCode(role):norm(role));
+  }
+  function projectProfile(){
+    const profiles=window.PROJECT_RULE_PROFILES||((typeof PROJECT_RULE_PROFILES!=='undefined')?PROJECT_RULE_PROFILES:{});
+    return profiles&&profiles[projectCode()]||{};
+  }
+  function configuredFallback(code){
+    const local=projectProfile().roleCompanyFallbacks||{};
+    if(Array.isArray(local[code])&&local[code].length)return local[code].slice();
+    return GLOBAL_ROLE_COMPANY_FALLBACKS.has(code)?GLOBAL_ROLE_COMPANY_FALLBACKS.get(code).slice():[];
+  }
+  function initiatorCompany(role,code){
+    if(!/^EN\d/i.test(code))return '';
+    const explicit=clean(role).match(/\(([^()]+)\)\s*$/);
+    if(explicit&&clean(explicit[1]))return canonicalCompany(explicit[1]);
+    const mapping=projectProfile().initiatorCompanyByLot||{};
+    for(const value of Object.values(mapping)){
+      if(roleCode(value)!==code)continue;
+      const match=clean(value).match(/\(([^()]+)\)\s*$/);
+      if(match&&clean(match[1]))return canonicalCompany(match[1]);
+    }
+    return '';
+  }
   function canonicalCompany(value){
     return clean(value).replace(/\s+/g,' ');
   }
@@ -28362,11 +28497,9 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     return window.membersData&&typeof window.membersData.forEach==='function'?window.membersData:null;
   }
   function companyForRole(role){
-    // L'entreprise initiatrice est déjà une désignation explicite, pas un acronyme de discipline.
-    if(/^EN\d/i.test(role))return {label:role,uncertain:false};
     const members=Array.isArray(window.membersDirectory)?window.membersDirectory:[];
-    const version=window.__membersVersion||0,index=roleIndex();
-    if(!directoryCache||directoryCache.members!==members||directoryCache.version!==version||directoryCache.size!==members.length||directoryCache.index!==index||directoryCache.indexSize!==(index&&index.size))directoryCache={members,version,size:members.length,index,indexSize:index&&index.size,roles:new Map()};
+    const version=window.__membersVersion||0,index=roleIndex(),project=projectCode();
+    if(!directoryCache||directoryCache.project!==project||directoryCache.members!==members||directoryCache.version!==version||directoryCache.size!==members.length||directoryCache.index!==index||directoryCache.indexSize!==(index&&index.size))directoryCache={project,members,version,size:members.length,index,indexSize:index&&index.size,roles:new Map()};
     const code=roleCode(role);
     if(directoryCache.roles.has(code))return directoryCache.roles.get(code);
     const companies=new Map();
@@ -28387,10 +28520,21 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     }
     let names=[...companies.values()].sort((a,b)=>a.localeCompare(b,'fr'));
     let confirmedFallback=false;
-    if(!names.length&&CONFIRMED_ROLE_COMPANY_FALLBACKS.has(code)){
-      names=CONFIRMED_ROLE_COMPANY_FALLBACKS.get(code).slice();
+    const initiator=initiatorCompany(role,code);
+    if(!names.length&&initiator){
+      names=[initiator];
+      source='Entreprise initiatrice confirmée du projet';
+      confirmedFallback=true;
+    }
+    const fallback=configuredFallback(code);
+    if(!names.length&&fallback.length){
+      names=fallback;
       source='Référentiel confirmé intégré';
       confirmedFallback=true;
+    }
+    if(!names.length&&/^EN\d/i.test(code)){
+      const result={label:clean(role)||code,displayLabel:clean(role)||code,uncertain:false,grouped:false,candidates:[],source:'Désignation initiatrice du workflow'};
+      directoryCache.roles.set(code,result);return result;
     }
     const groupedArch=code==='ARCH'&&names.length>1;
     const result=names.length===1||groupedArch||confirmedFallback?
@@ -28494,7 +28638,12 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     text('v211-company-total',number(summary.total)+' WF uniques représentés · '+number(summary.companies.length)+' sociétés / attributions');
     text('v212-file-role-total',number(summary.fileCount)+' fichiers / versions distincts · '+number(summary.fileRoles.length)+' rôles');
     text('v212-file-company-total',number(summary.fileCount)+' fichiers / versions distincts · '+number(summary.fileCompanies.length)+' sociétés / attributions');
-    text('v212-company-source-note','Correspondances lues dans les colonnes Rôle et Société de Membres. À défaut : BDC et PMR → OGCE / OGCX, MNB → AREP, MOD → CFLImmo. ARCH est recherché comme un mot ; Mandataire identifie MOG, pas MOEG_Chef-Projet seul.');
+    const sourceNote=projectCode()==='DEPB5'
+      ? 'DEPB5 : correspondances d’abord lues dans Membres. À défaut, entreprises initiatrices confirmées : EN00 → BALT, EN01 → BAAT, EN02 → GALR, EN04 → MESO. Lots 03, 04.1 et 05 signalés en appel d’offres. MOD → CFLImmo reste une règle commune.'
+      : (projectCode()==='ADCRM'
+        ? 'ADCRM : correspondances lues dans les colonnes Rôle et Société de Membres. À défaut : BDC et PMR → OGCE / OGCX, MNB → AREP, MOD → CFLImmo. ARCH est recherché comme un mot ; Mandataire identifie MOG, pas MOEG_Chef-Projet seul.'
+        : 'Correspondances d’abord lues dans les colonnes Rôle et Société de Membres. MOD → CFLImmo est la seule règle commune ; les autres attributions restent propres au projet.');
+    text('v212-company-source-note',sourceNote);
     const warnings=[];
     if(summary.uncertainCount)warnings.push(number(summary.uncertainCount)+' WF : attribution de société à vérifier dans Membres.');
     summary.conflicts.forEach(message=>warnings.push('À vérifier : '+message+'.'));
