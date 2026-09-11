@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CFLImmo - Dashboard Documentaire DEPB5 - V232</title>
+    <title>CFLImmo - Dashboard Documentaire DEPB5 - V246</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com">
 
@@ -3298,6 +3298,14 @@
             window.membersByRole = p.membersByRole || new Map();
             wfMap = p.wfMap;
             reviewHistoryState = (typeof v57HydrateReviewHistoryState === 'function') ? v57HydrateReviewHistoryState(p.reviewHistoryState) : (p.reviewHistoryState || null);
+            // V240 : un état enregistré par une version antérieure peut contenir
+            // les lignes CSV brutes mais des index vides à cause du BOM sur « id ».
+            // Les index sont reconstruits automatiquement à l'ouverture.
+            try {
+                const rawHistory = reviewHistoryState && reviewHistoryState.raw;
+                const hasRawHistory = rawHistory && ['comments','documents','reviews','notes'].some(type => Array.isArray(rawHistory[type]) && rawHistory[type].length > 0);
+                if (hasRawHistory && typeof v57BuildReviewHistoryIndexes === 'function') v57BuildReviewHistoryIndexes();
+            } catch (e) { console.warn('[V240] Réindexation de l’historique enregistré impossible', e); }
             isReferentialLoaded = p.isReferentialLoaded;
             customLogoBase64 = p.customLogoBase64;
             customBannerBase64 = p.customBannerBase64;
@@ -3595,6 +3603,13 @@
         function handleUpload(event, type) {
             const files = event.target.files;
             if (files.length === 0) return;
+            if (type === 'wf') {
+                window.__wfImportCoverStats = null;
+                window.__wfReportStatusById = new Map();
+                window.__wfImportGeneration = (Number(window.__wfImportGeneration) || 0) + 1;
+                wfMap = new Map();
+                window.wfMap = wfMap;
+            }
             let filesProcessed = 0;
             const memberBatch = {members:[], parsedSheets:0, failed:false};
             function checkDone() {
@@ -3627,6 +3642,9 @@
                     if (rawLogData.length > 0) {
                         const btn = document.getElementById('btn-generate');
                         if(btn) btn.removeAttribute('disabled');
+                    }
+                    if (type === 'wf' && typeof window.v231RefreshWorkflowSummary === 'function') {
+                        setTimeout(() => window.v231RefreshWorkflowSummary(), 0);
                     }
                     lucide.createIcons();
                 }
@@ -4068,27 +4086,6 @@
             const commentsByDoc = new Map();
             const notesByReview = new Map();
             const reviewsById = new Map();
-            const roundStartsByReview = new Map();
-
-            const registerRoundStart = (reviewId, roundValue, dateValue, source, priority) => {
-                const id = String(reviewId || '').trim();
-                const roundMatch = String(roundValue || '').match(/\d+/);
-                const round = roundMatch ? String(Number(roundMatch[0])) : '';
-                const rawDate = String(dateValue || '').trim();
-                const ts = rawDate ? Date.parse(rawDate) : 0;
-                if (!id || !round || !ts) return;
-                if (!roundStartsByReview.has(id)) roundStartsByReview.set(id, new Map());
-                const byRound = roundStartsByReview.get(id);
-                const existing = byRound.get(round);
-                if (!existing || priority > existing.priority || (priority === existing.priority && ts < existing.ts)) {
-                    byRound.set(round, { value: rawDate, ts, source, priority });
-                }
-            };
-            const roundStartInfo = (reviewId, roundValue) => {
-                const roundMatch = String(roundValue || '').match(/\d+/);
-                const round = roundMatch ? String(Number(roundMatch[0])) : '';
-                return round && roundStartsByReview.has(reviewId) ? (roundStartsByReview.get(reviewId).get(round) || null) : null;
-            };
 
             (s.raw.comments || []).forEach(r => {
                 if (String(v57Cell(r, ['deleted_at']) || '').trim()) return;
@@ -4118,7 +4115,6 @@
                     updated_at: v57Cell(r, ['updated_at']),
                     round_num: v57Cell(r, ['round_num']) || '1'
                 });
-                registerRoundStart(reviewId, v57Cell(r, ['round_num']) || '1', v57Cell(r, ['created_at']) || v57Cell(r, ['updated_at']), 'première note du round', 100);
             });
 
             (s.raw.reviews || []).forEach(r => {
@@ -4135,7 +4131,6 @@
                     finished_at: v57Cell(r, ['finished_at']),
                     started_at: v57Cell(r, ['started_at'])
                 });
-                registerRoundStart(id, '1', v57Cell(r, ['started_at']), 'démarrage du workflow / round 1', 400);
             });
 
             s.byEntity = new Map();
@@ -4162,6 +4157,10 @@
             */
 
             const fileBuckets = new Map();
+            // V246 — index complémentaire par review pour les WF retournés à l'initiateur.
+            // Dans les exports Autodesk, un retour crée un nouveau review_document pour le même VFROOT,
+            // souvent sans commentaire dans le round actif. On conserve donc les rounds même vides.
+            const fileEntriesByReview = new Map();
 
             const addToSet = (set, values) => {
                 (values || []).forEach(v => { if (v) set.add(v); });
@@ -4192,8 +4191,6 @@
 
                 if (!docId || !reviewId || !urn) return;
 
-                registerRoundStart(reviewId, v57Cell(d, ['round_num']) || '1', v57Cell(d, ['created_at']) || v57Cell(d, ['updated_at']), 'lancement du document dans le round', 300);
-
                 const keys = v57EntityKeys(urn);
                 const bucketKey = bucketKeyForDocument(reviewId, urn);
                 if (!bucketKey || !keys.length) return;
@@ -4202,24 +4199,78 @@
                     fileBuckets.set(bucketKey, {
                         reviewId,
                         keys: new Set(),
-                        comments: []
+                        comments: [],
+                        rounds: new Set()
                     });
                 }
 
                 const bucket = fileBuckets.get(bucketKey);
                 addToSet(bucket.keys, keys);
+                const docRound = String(v57Cell(d, ['round_num']) || '').trim();
+                if (docRound) bucket.rounds.add(docRound);
 
                 const docComments = commentsByDoc.get(docId) || [];
                 bucket.comments.push(...docComments);
-                docComments.forEach(comment => registerRoundStart(reviewId, comment.round_num || '1', comment.created_at || comment.updated_at, 'premier commentaire du round', 200));
             });
 
             fileBuckets.forEach(bucket => {
                 const reviewId = bucket.reviewId;
                 const meta = reviewsById.get(reviewId) || {};
-                const roundsText = v57FormatGroupedRows(bucket.comments || [], 'comment');
-                const notesText = v57FormatGroupedRows(notesByReview.get(reviewId) || [], 'note');
-                const startInfo = roundStartInfo(reviewId, meta.current_round_num || '');
+                const statusNorm = String(meta.status || '').trim().toLowerCase();
+                const returnedToInitiator = /restart|waiting\s*for\s*initiator|return.*initiator|initiator/.test(statusNorm);
+                const currentRound = String(meta.current_round_num || '').trim();
+
+                let roundsText = v57FormatGroupedRows(bucket.comments || [], 'comment');
+                let notesText = v57FormatGroupedRows(notesByReview.get(reviewId) || [], 'note');
+                let lastCompletedComments = '';
+
+                if (returnedToInitiator) {
+                    // Autodesk crée généralement le nouveau round sans commentaires. On doit tout de même
+                    // matérialiser les rounds pour que l'utilisateur voie le retour à l'initiateur.
+                    const roundSet = new Set(Array.from(bucket.rounds || []));
+                    if (currentRound) roundSet.add(currentRound);
+                    (bucket.comments || []).forEach(c => {
+                        const r = String(c.round_num || c.roundNum || '').trim();
+                        if (r) roundSet.add(r);
+                    });
+                    const roundList = Array.from(roundSet).sort((a,b)=>(parseInt(a,10)||0)-(parseInt(b,10)||0));
+                    const blocks = [];
+                    let latestCompletedNum = -1;
+                    let latestCompletedBody = '';
+                    const currentNum = parseInt(currentRound,10) || 0;
+
+                    roundList.forEach(round => {
+                        const roundComments = (bucket.comments || []).filter(c => String(c.round_num || c.roundNum || '1').trim() === String(round));
+                        const formatted = v57FormatGroupedRows(roundComments, 'comment');
+                        if (formatted) {
+                            blocks.push(formatted);
+                            const n = parseInt(round,10) || 0;
+                            // Pour un WF retourné, le dernier round terminé est normalement le round précédent.
+                            if ((!currentNum || n < currentNum) && n >= latestCompletedNum) {
+                                latestCompletedNum = n;
+                                latestCompletedBody = formatted.replace(new RegExp('^ROUND\\s+'+String(round)+'\\s*\\n?', 'i'), '').trim();
+                            }
+                        } else {
+                            const n = parseInt(round,10) || 0;
+                            if (currentNum && n === currentNum) {
+                                blocks.push(`ROUND ${round}\n- [État WF] Retour à l’initiateur — nouveau round ouvert, en attente de l’initiateur.`);
+                            } else {
+                                blocks.push(`ROUND ${round}\n- [Information Autodesk] Aucun commentaire exporté pour ce round.`);
+                            }
+                        }
+                    });
+                    roundsText = v57CleanLongCellText(blocks.join('\n\n'));
+                    lastCompletedComments = latestCompletedBody || '[Information Autodesk] Aucun commentaire exporté pour le round précédent.';
+
+                    // Les workflow_notes de certains retours sont présentes mais leur champ note est vide.
+                    // La progression ne doit pas rester visuellement vide : on ajoute uniquement l'état déduit
+                    // de reviews.status = restarting, clairement marqué comme état WF et non comme commentaire utilisateur.
+                    if (currentRound) {
+                        const stateBlock = `ROUND ${currentRound}\n- [État WF] Workflow retourné à l’initiateur — en attente d’une nouvelle soumission.`;
+                        const hasCurrentRoundInNotes = new RegExp(`(^|\\n)ROUND\\s+${currentRound}(?:\\s|$)`, 'i').test(notesText || '');
+                        if (!hasCurrentRoundInNotes) notesText = v57CleanLongCellText([notesText, stateBlock].filter(Boolean).join('\n\n'));
+                    }
+                }
 
                 const entry = {
                     reviewId,
@@ -4229,35 +4280,51 @@
                     workflowName: meta.workflow_name || '',
                     reviewName: meta.review_name || '',
                     currentRound: meta.current_round_num || '',
-                    roundStartedAt: startInfo ? startInfo.value : '',
-                    roundStartSource: startInfo ? startInfo.source : '',
+                    reviewStatus: meta.status || '',
+                    returnedToInitiator,
+                    lastCompletedComments,
                     hasHistory: !!roundsText,
                     hasNotes: !!notesText,
-                    historyScope: 'file'
+                    historyScope: returnedToInitiator ? 'file-returned-to-initiator' : 'file'
                 };
 
                 (bucket.keys || new Set()).forEach(k => s.byEntity.set(k, entry));
+                if (!fileEntriesByReview.has(reviewId)) fileEntriesByReview.set(reviewId, []);
+                fileEntriesByReview.get(reviewId).push(entry);
             });
 
             reviewsById.forEach((meta, reviewId) => {
-                const notesText = v57FormatGroupedRows(notesByReview.get(reviewId) || [], 'note');
-                const startInfo = roundStartInfo(reviewId, meta.current_round_num || '');
+                const notesTextBase = v57FormatGroupedRows(notesByReview.get(reviewId) || [], 'note');
+                const statusNorm = String(meta.status || '').trim().toLowerCase();
+                const returnedToInitiator = /restart|waiting\s*for\s*initiator|return.*initiator|initiator/.test(statusNorm);
+                const fileEntries = fileEntriesByReview.get(reviewId) || [];
+                // V246 : si le WF retourné ne concerne qu'un seul fichier logique (même VFROOT sur plusieurs rounds),
+                // le fallback par ID/URL WF est sûr et peut transporter l'historique du fichier. Cela évite la perte
+                // des rounds quand l'URL entityId n'est pas disponible dans le journal des fichiers.
+                const singleReturnedFile = returnedToInitiator && fileEntries.length === 1 ? fileEntries[0] : null;
+                let notesText = singleReturnedFile ? (singleReturnedFile.notes || notesTextBase) : notesTextBase;
+                if (returnedToInitiator && meta.current_round_num) {
+                    const cr = String(meta.current_round_num).trim();
+                    const hasCurrentRoundInNotes = new RegExp(`(^|\\n)ROUND\\s+${cr}(?:\\s|$)`, 'i').test(notesText || '');
+                    if (!hasCurrentRoundInNotes) {
+                        const stateBlock = `ROUND ${cr}\n- [État WF] Workflow retourné à l’initiateur — en attente d’une nouvelle soumission.`;
+                        notesText = v57CleanLongCellText([notesText, stateBlock].filter(Boolean).join('\n\n'));
+                    }
+                }
                 const entry = {
                     reviewId,
                     sequenceId: meta.sequence_id || '',
-                    // V81 : volontairement vide en fallback WF.
-                    // Sans correspondance fichier/URN fiable, on évite de polluer la ligne avec
-                    // les commentaires de tous les documents du même workflow.
-                    rounds: '',
+                    rounds: singleReturnedFile ? (singleReturnedFile.rounds || '') : '',
                     notes: notesText,
                     workflowName: meta.workflow_name || '',
                     reviewName: meta.review_name || '',
                     currentRound: meta.current_round_num || '',
-                    roundStartedAt: startInfo ? startInfo.value : '',
-                    roundStartSource: startInfo ? startInfo.source : '',
-                    hasHistory: false,
+                    reviewStatus: meta.status || '',
+                    returnedToInitiator,
+                    lastCompletedComments: singleReturnedFile ? (singleReturnedFile.lastCompletedComments || '') : '',
+                    hasHistory: !!(singleReturnedFile && singleReturnedFile.rounds),
                     hasNotes: !!notesText,
-                    historyScope: 'workflow-notes-only'
+                    historyScope: singleReturnedFile ? 'returned-single-file-fallback' : 'workflow-notes-only'
                 };
 
                 s.byReviewId.set(v57ReviewUuidKey(reviewId), entry);
@@ -4318,14 +4385,12 @@
         function v57AttachHistoryToWorkflowObject(wfObj, params) {
             if (!wfObj) return wfObj;
             const h = v57FindHistoryForDocument(Object.assign({}, params || {}, { wfData: wfObj }));
-            if (h && (h.rounds || h.notes || h.currentRound || h.roundStartedAt)) {
+            if (h && (h.rounds || h.notes)) {
                 wfObj.historyRounds = h.rounds || wfObj.historyRounds || '';
                 wfObj.progressNotes = h.notes || wfObj.progressNotes || '';
                 if (!wfObj.wfName && h.workflowName) wfObj.wfName = h.workflowName;
                 if (!wfObj.id && h.sequenceId) wfObj.id = h.sequenceId;
                 if (!wfObj.currentRound && h.currentRound) wfObj.currentRound = h.currentRound;
-                if (!wfObj.roundStartedAt && h.roundStartedAt) wfObj.roundStartedAt = h.roundStartedAt;
-                if (!wfObj.roundStartSource && h.roundStartSource) wfObj.roundStartSource = h.roundStartSource;
             }
             return wfObj;
         }
@@ -4333,13 +4398,39 @@
         function handleReviewHistoryUpload(event) {
             const files = event && event.target ? Array.from(event.target.files || []) : [];
             if (!files.length) return;
-            reviewHistoryState = v57EmptyReviewHistoryState();
+            v57EnsureReviewHistoryState();
+            // Une sélection remplace uniquement les types qu'elle contient ; les
+            // autres CSV déjà importés restent disponibles entre plusieurs sélections.
+            const importBatch = { types: new Set(), fileNames: files.map(file => file.name), recognizedFiles: 0, recognizedRows: 0, ignoredFiles: [], parserErrors: [] };
+            window.__v239HistoryImportBatch = importBatch;
             let done = 0;
             const finish = () => {
                 done++;
                 if (done >= files.length) {
+                    if (window.__v239HistoryImportBatch === importBatch) window.__v239HistoryImportBatch = null;
                     v57BuildReviewHistoryIndexes();
-                    if (typeof window.showToast === 'function') window.showToast('Historique WF ACC importé.', 'success');
+
+                    // V245 : la décision du toast repose sur les données réellement chargées,
+                    // pas sur recognizedFiles initialisé à 0 dans l'ancienne version.
+                    const state = v57EnsureReviewHistoryState();
+                    const loadedTypes = ['comments','documents','notes','reviews'].filter(type =>
+                        state.raw && Array.isArray(state.raw[type]) && state.raw[type].length > 0
+                    );
+                    const stats = state.stats || window.__reviewHistoryStats || {};
+                    const ready = loadedTypes.length === 4
+                        && Number(stats.reviews || 0) > 0
+                        && Number(stats.documents || 0) > 0;
+
+                    if (typeof window.showToast === 'function') {
+                        if (ready) {
+                            const totalRows = Number(stats.comments || 0) + Number(stats.documents || 0) + Number(stats.notes || 0) + Number(stats.reviews || 0);
+                            window.showToast(`Historique WF ACC importé : 4/4 sources reconnues · ${totalRows} lignes indexées.`, 'success');
+                        } else if (importBatch.recognizedFiles > 0 || loadedTypes.length > 0) {
+                            window.showToast(`Historique WF partiel : ${loadedTypes.length}/4 source(s) disponible(s). Les données reconnues sont conservées.`, 'warning');
+                        } else {
+                            window.showToast('Aucun CSV d’historique WF exploitable n’a été reconnu.', 'error');
+                        }
+                    }
                     const btn = document.getElementById('btn-generate');
                     if (btn && rawLogData.length > 0) btn.removeAttribute('disabled');
                 }
@@ -4349,11 +4440,23 @@
                     header: true,
                     skipEmptyLines: true,
                     complete: (results) => {
-                        try { extractReviewHistoryFromCsvRows(results.data || [], file.name); }
+                        if (results && Array.isArray(results.errors) && results.errors.length) importBatch.parserErrors.push(...results.errors.map(err => ({file:file.name,code:err.code || '',message:err.message || ''})));
+                        const parsedRows = (results && Array.isArray(results.data)) ? results.data : [];
+                        const nonEmptyRows = parsedRows.filter(r => r && Object.values(r).some(v => String(v == null ? '' : v).trim() !== ''));
+                        let detectedType = '';
+                        try { detectedType = v57DetectReviewCsvType(nonEmptyRows, file.name); } catch(e) {}
+                        if (detectedType) {
+                            importBatch.recognizedFiles++;
+                            importBatch.recognizedRows += nonEmptyRows.length;
+                            importBatch.types.add(detectedType);
+                        } else {
+                            importBatch.ignoredFiles.push(file.name);
+                        }
+                        try { extractReviewHistoryFromCsvRows(parsedRows, file.name); }
                         catch (e) { console.error('[Review History V81] erreur import', file.name, e); }
                         finish();
                     },
-                    error: (err) => { console.error('[Review History V81] erreur CSV', err); finish(); }
+                    error: (err) => { importBatch.parserErrors.push({file:file.name,message:String(err && err.message || err || 'Erreur CSV')}); console.error('[Review History V81] erreur CSV', err); finish(); }
                 });
             });
         }
@@ -4369,6 +4472,47 @@
             if (!arrayOfArrays || !arrayOfArrays.length) return;
 
             const n = (v) => normalizeForRoleSearch(v);
+            const readCoverStats = (rows) => {
+                const list = Array.isArray(rows) ? rows : [];
+                const preview = list.slice(0, 30).flat().map(v => String(v == null ? '' : v)).join(' | ');
+                const normalizedPreview = n(preview);
+                const totalLabel = /(?:NOMBRE|NUMBER|TOTAL).{0,24}(?:REVUE|REVIEW|WORKFLOW|WF)|(?:REVUE|REVIEW|WORKFLOW|WF).{0,24}(?:TOTAL|NOMBRE|UNIQUE)/;
+                const hasCoverTitle = /(RESUME.*(REVUE|REVIEW|WORKFLOW|WF)|SUMMARY.*(REVIEW|WORKFLOW|WF)|VERIFIER LE RAPPORT|VERIFY REPORT|RAPPORT.*(REVUE|REVIEW|WORKFLOW|WF))/.test(normalizedPreview);
+                const hasCoverTotal = list.slice(0, 80).some(row => totalLabel.test(n((row || []).join(' | '))));
+                if (!hasCoverTitle && !hasCoverTotal) return null;
+                const out = { total:null, open:null, closed:null, invalid:null, returned:null };
+                const countInRow = (row) => {
+                    const values = (row || []).map(v => String(v == null ? '' : v).trim()).filter(Boolean);
+                    const candidates = [];
+                    values.forEach(value => {
+                        // Les dates de la page de garde ne sont pas des compteurs.
+                        if (/\b\d{1,4}[./-]\d{1,2}[./-]\d{2,4}\b/.test(value)) return;
+                        const matches = value.match(/\b\d[\d .]*\b/g) || [];
+                        matches.forEach(token => {
+                            const digits = token.replace(/[^0-9]/g, '');
+                            if (!digits) return;
+                            const number = Number(digits);
+                            if (Number.isFinite(number) && number < 1000000 && !(digits.length === 4 && number >= 1900)) candidates.push(number);
+                        });
+                    });
+                    return candidates.length ? candidates[candidates.length - 1] : null;
+                };
+                list.slice(0, 80).forEach(row => {
+                    const label = n((row || []).map(v => String(v == null ? '' : v)).join(' | '));
+                    const number = countInRow(row);
+                    if (number == null) return;
+                    if (totalLabel.test(label) || /(?:WF|WORKFLOW|REVUE|REVIEW)\s+UNIQUES?/.test(label)) out.total = number;
+                    else if (/(RETOUR|RENVOY|RETURN|BACK).*?(INITIATEUR|INITIATOR|EMETTEUR|SENDER)/.test(label)) out.returned = number;
+                    else if (/(INVALID|INVALIDE|CADUC|ANNULE|VOID)/.test(label)) out.invalid = number;
+                    else if (/(FERME|CLOTUR|CLOSED|COMPLET|TERMINE)/.test(label)) out.closed = number;
+                    else if (/(OUVERT|OPEN|IN REVIEW|EN COURS|IN PROGRESS|EN ATTENTE|WAITING)/.test(label) && !/(RETOUR|RENVOY|RETURN|BACK)/.test(label)) out.open = number;
+                });
+                return out.total == null ? null : out;
+            };
+            const coverStats = readCoverStats(arrayOfArrays);
+            if (coverStats) {
+                window.__wfImportCoverStats = { ...coverStats, source:'page de garde du rapport WF', importedAt:new Date().toISOString() };
+            }
             const cellText = (row, idx) => idx === undefined || idx < 0 ? '' : String((row || [])[idx] ?? '').trim();
             const has = (txt, patterns) => patterns.some(p => p instanceof RegExp ? p.test(txt) : txt.includes(String(p).toUpperCase()));
             const findCol = (row, patterns, excludePatterns = []) => {
@@ -4510,6 +4654,32 @@
                 const wfUrl = getLink(row, colMap.id, r) || getLink(row, colMap.reviewName, r) || getLink(row, colMap.wfName, r);
                 const fileUrl = getLink(row, colMap.file, r);
 
+                if (wfId) {
+                    if (!(window.__wfReportStatusById instanceof Map)) window.__wfReportStatusById = new Map();
+                    const rawRecord = {
+                        id: wfId,
+                        globStat,
+                        step,
+                        currentRound: getVal(row, colMap.cycle, r),
+                        dateC: getVal(row, colMap.dateC, r),
+                        dateE: getVal(row, colMap.dateE, r),
+                        dateCl: getVal(row, colMap.dateCl, r)
+                    };
+                    const priorRecord = window.__wfReportStatusById.get(wfId);
+                    const roundRank = value => Number(String(value && value.currentRound || '').match(/\d+/)?.[0] || 0);
+                    const stateRank = value => {
+                        const state = String(value && value.globStat || '').trim();
+                        if (isWorkflowOpenStatus(state)) return 30;
+                        if (isWorkflowInvalidStatus(state)) return 20;
+                        if (isWorkflowClosedStatus(state)) return 10;
+                        return 0;
+                    };
+                    if (!priorRecord || roundRank(rawRecord) > roundRank(priorRecord)
+                        || (roundRank(rawRecord) === roundRank(priorRecord) && stateRank(rawRecord) >= stateRank(priorRecord))) {
+                        window.__wfReportStatusById.set(wfId, rawRecord);
+                    }
+                }
+
                 const obj = {
                     id: wfId || wfIdRaw,
                     wfName,
@@ -4579,7 +4749,8 @@
                 mapKeys: buckets.size,
                 headerRow: headerRowIdx + 1,
                 detectedColumns: colMap,
-                sampleIds: Array.from(touchedIds).slice(0, 12)
+                sampleIds: Array.from(touchedIds).slice(0, 12),
+                coverStats: window.__wfImportCoverStats || null
             };
             const wfMsg = `Mappage WF lu : ${importedRows} ligne(s), ${touchedIds.size} ID WF, ${touchedFiles.size} fichier(s), en-têtes ligne ${headerRowIdx + 1}`;
             document.querySelectorAll('.status-wf').forEach(el => {
@@ -4882,7 +5053,7 @@
                 wfData = finalizeWorkflowRoleInfo(wfData);
 
                 const workflowStr = wfData.id || wfOriginal;
-                const commentsStr = wfData.comments || commOriginal;
+                let commentsStr = wfData.comments || commOriginal;
                 
                 const workflowUrl = wfData.wfUrl || wfOriginalUrl;
                 const fileUrl = wfData.fileUrl || directFileUrl || pathUrl;
@@ -5072,6 +5243,11 @@
                 const wfIsCaducInvalidForRow = isWorkflowInvalidStatus(wfGlobalStatusForRow || wfData.globStat || '');
                 const v57Hist = (typeof v57FindHistoryForDocument === 'function') ? v57FindHistoryForDocument({ wfData, fileUrl, workflowUrl, directFileUrl, pathUrl, nomComplet, exactName, version: upVersion }) : {};
                 if (v57Hist && v57Hist.currentRound && !wfData.currentRound) wfData.currentRound = v57Hist.currentRound;
+                // V246 — Autodesk laisse la colonne Comments du rapport vide quand un WF est retourné à l'initiateur.
+                // Dans ce cas seulement, on affiche les commentaires du dernier round terminé issus du Data Connector.
+                if ((!commentsStr || !String(commentsStr).trim()) && v57Hist && v57Hist.returnedToInitiator && v57Hist.lastCompletedComments) {
+                    commentsStr = v57Hist.lastCompletedComments;
+                }
                 if (v57Hist && v57Hist.roundStartedAt && !wfData.roundStartedAt) wfData.roundStartedAt = v57Hist.roundStartedAt;
                 if (v57Hist && v57Hist.roundStartSource && !wfData.roundStartSource) wfData.roundStartSource = v57Hist.roundStartSource;
                 const v58HistResolved = (typeof v58ResolveHistoryAuthorsForRow === 'function')
@@ -15363,6 +15539,9 @@
         row.extractedWfName = '';
         row.extractedWfGlobalStatus = '';
         row.extractedRevisionStatus = '';
+        row.extractedComments = '';
+        row.extractedWfRoundsHistory = '';
+        row.extractedWfProgressNotes = '';
         row.extractedRolesReq = '';
         row.extractedRolesReqDetails = '';
         row.extractedRolesBlk = '';
@@ -17026,7 +17205,7 @@
     }
     function buildExactFileIndex(){
         const size = wfMapSize();
-        const sig = String(size);
+        const sig = String(size) + '|' + (Number(window.__wfImportGeneration) || 0);
         if (idx.sig === sig) return idx;
         const byFile = new Map();
         try {
@@ -26255,7 +26434,9 @@ self.onmessage=async function(ev){
         ['R8F2KYBSQS3Y58AU', 'Jean-Pascal Bourdouxhe'],
         ['UJ224U6JR2MKNZFV', 'Sebastian Sieg'],
         ['URSJ5SDBJPL3PGRM', 'Artur Michalak'],
-        ['SVN234NJPPQQUR9U', 'Anna Mugele']
+        ['SVN234NJPPQQUR9U', 'Anna Mugele'],
+        ['DNB2PX8QNQ5A8832', 'Nicolas Dupont'],
+        ['SE2W2WJYABL5PMBW', 'Denisa Pereirapinto']
     ]);
 
     function clean(v){ return String(v == null ? '' : v).replace(/\r\n?/g, '\n').trim(); }
@@ -27041,7 +27222,9 @@ self.onmessage=async function(ev){
     'SVN234NJPPQQUR9U':'Anna Mugele',
     'E2RNLPTNT3H5':'Paul Deslandes',
     'LCE9LHTGDMAY':'Claude Mauritz',
-    'TU92294WQ34PW7C9':'Mehmetali Elhan'
+    'TU92294WQ34PW7C9':'Mehmetali Elhan',
+    'DNB2PX8QNQ5A8832':'Nicolas Dupont',
+    'SE2W2WJYABL5PMBW':'Denisa Pereirapinto'
   };
   const manual=new Map();
   let modal=null;
@@ -28545,16 +28728,16 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   'use strict';
   if(window.__v209GlobalWorkflowStatusFilterInstalled)return;
   window.__v209GlobalWorkflowStatusFilterInstalled=true;
-  window.__CFL_IMMO_DASHBOARD_VERSION__='V232';
+  window.__CFL_IMMO_DASHBOARD_VERSION__='V241';
 
   function refresh(){
     try{if(typeof v210RefreshAllRoles==='function')v210RefreshAllRoles();}catch(e){console.warn('[V210] Recalcul des auteurs et rôles',e);}
     try{if(typeof window.v209RefreshGlobalWorkflowStatusFilter==='function')window.v209RefreshGlobalWorkflowStatusFilter();}catch(e){console.warn('[V209] Catalogue Statut global WF',e);}
   }
   function version(){
-    window.__CFL_IMMO_DASHBOARD_VERSION__='V232';
-    try{document.title='CFLImmo - Dashboard Documentaire DEPB5 - V232';}catch(e){}
-    document.documentElement.setAttribute('data-dashboard-version','V227');
+    window.__CFL_IMMO_DASHBOARD_VERSION__='V241';
+    try{document.title='CFLImmo - Dashboard Documentaire DEPB5 - V241';}catch(e){}
+    document.documentElement.setAttribute('data-dashboard-version','V241');
   }
   function installProcessHook(){
     const prior=window.processAllData||((typeof processAllData==='function')?processAllData:null);
@@ -28668,7 +28851,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     const version=window.__membersVersion||0,index=roleIndex(),project=projectCode();
     if(!directoryCache||directoryCache.project!==project||directoryCache.members!==members||directoryCache.version!==version||directoryCache.size!==members.length||directoryCache.index!==index||directoryCache.indexSize!==(index&&index.size))directoryCache={project,members,version,size:members.length,index,indexSize:index&&index.size,roles:new Map()};
     const code=roleCode(role);
-    const override=window.__V232_ROLE_COMPANY_OVERRIDES&&window.__V232_ROLE_COMPANY_OVERRIDES[project]&&window.__V232_ROLE_COMPANY_OVERRIDES[project][code];
+    const override=window.__V239_ROLE_COMPANY_OVERRIDES&&window.__V239_ROLE_COMPANY_OVERRIDES[project]&&window.__V239_ROLE_COMPANY_OVERRIDES[project][code];
     if(Array.isArray(override)&&override.length){
       const labels=override.map(canonicalCompany).filter(Boolean);
       const result={label:labels.join(' / '),displayLabel:labels.join(' / '),uncertain:false,grouped:code==='ARCH'&&labels.length>1,candidates:labels,source:'Référentiel DEPB5 confirmé'};
@@ -28853,7 +29036,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
 (function(){
   'use strict';
   const PROJECT_ID='DEPB5';
-  const VERSION='V232';
+  const VERSION='V241';
   function lock(){
     try{
       if(typeof activeProject!=='undefined'&&activeProject!==PROJECT_ID) activeProject=PROJECT_ID;
@@ -28874,7 +29057,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
         selector.title='Dashboard dédié au projet DEPB5';
       }
       document.querySelectorAll('.dynamic-project-code').forEach(function(el){el.textContent=PROJECT_ID;});
-    }catch(error){console.warn('[V232 DEPB5]',error);}
+    }catch(error){console.warn('[V239 DEPB5]',error);}
   }
   window.v228LockDEPB5=lock;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',lock,{once:true});else lock();
@@ -28948,7 +29131,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
       patchBarNumbers('v212-file-company-bars',summary.fileCompanies||[],'file',totalWf,totalFiles);
       setText('v211-company-total',totalWf.toLocaleString('fr-FR')+' WF uniques · '+(summary.companies||[]).length.toLocaleString('fr-FR')+' sociétés · '+totalFiles.toLocaleString('fr-FR')+' fichiers');
       setText('v212-file-company-total',totalFiles.toLocaleString('fr-FR')+' fichiers / versions · '+(summary.fileCompanies||[]).length.toLocaleString('fr-FR')+' sociétés · '+totalWf.toLocaleString('fr-FR')+' WF');
-    }catch(error){console.warn('[V232 graphes]',error);}
+    }catch(error){console.warn('[V239 graphes]',error);}
   }
   function refreshWfKpi(){
     const ids=overdueState(),groups=workflowGroups(),counts={TOTAL:groups.size,OVERDUE:ids.size,OPEN:0,INITIATEUR:0,CLOSED:0,INVALID:0,NOWF:0};
@@ -28957,7 +29140,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
       if(/INVALID|CADUC|ANNULE|VOID/.test(raw))counts.INVALID++;else if(/FERME|CLOTUR|CLOSED|COMPLET|TERMINE/.test(raw)||row&&row.wfData&&row.wfData.dateCl)counts.CLOSED++;else if(/INITIATEUR|INITIATOR|EMETTEUR|SENDER/.test(raw+' '+clean(row&&row.extractedCurrentStep)))counts.INITIATEUR++;else counts.OPEN++;
     });
     counts.NOWF=rows().filter(row=>!wfId(row)).length;
-    window.__V232_WF_COUNTS=counts;window.__V232OverdueWorkflowIds=ids;
+    window.__V239_WF_COUNTS=counts;window.__V239OverdueWorkflowIds=ids;
     document.querySelectorAll('#v187-wf-grid .v187-wf-card').forEach(card=>{
       const title=clean((card.querySelector('.v187-wf-title')||{}).textContent).toLowerCase();
       if(title==='wf échus'){
@@ -28992,7 +29175,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   'use strict';
   if(window.__v230Depb5FixInstalled)return;
   window.__v230Depb5FixInstalled=true;
-  window.__V232_ROLE_COMPANY_OVERRIDES={
+  window.__V239_ROLE_COMPANY_OVERRIDES={
     DEPB5:{ARCH:['ARAA (A+A)'],BDC:['OGCE','OGCX'],TSPE:['SGIT (SGI)'],STRU:['SGIS (SGI)'],MNB:['SGI']}
   };
   try{window.__membersVersion=(Number(window.__membersVersion)||0)+1;}catch(e){}
@@ -29026,12 +29209,12 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     return ids;
   }
   function refreshOverdue(){
-    const ids=overdueIds();window.__V232OverdueWorkflowIds=ids;
+    const ids=overdueIds();window.__V239OverdueWorkflowIds=ids;
     return ids;
   }
   const baseOverdue=typeof window.v106IsRowOverdue==='function'?window.v106IsRowOverdue:null;
   window.v106IsRowOverdue=function(row){
-    if(window.__v228OverdueScope){const ids=window.__V232OverdueWorkflowIds||refreshOverdue();return ids.has(wfId(row));}
+    if(window.__v228OverdueScope){const ids=window.__V239OverdueWorkflowIds||refreshOverdue();return ids.has(wfId(row));}
     return baseOverdue?baseOverdue(row):false;
   };
   function updateSmartButton(){
@@ -29041,7 +29224,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   }
   function applyOverdue(){
     refreshOverdue();window.__v106FilterOverdue=!!window.__v228OverdueScope;updateSmartButton();
-    try{if(typeof window.applyFiltersNow==='function')return window.applyFiltersNow();if(typeof applyFilters==='function')return applyFilters();}catch(e){console.warn('[V232 WF échus]',e);}
+    try{if(typeof window.applyFiltersNow==='function')return window.applyFiltersNow();if(typeof applyFilters==='function')return applyFilters();}catch(e){console.warn('[V239 WF échus]',e);}
     return [];
   }
   // Intercept the smart-filter button before the legacy click handler. The
@@ -29092,22 +29275,64 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   function latest(group){return group.slice().sort((a,b)=>round(b)-round(a)||rankDate(b)-rankDate(a))[0]||null;}
   function classify(row){
     const wf=row&&row.wfData||{}, status=clean(row&&row.extractedWfGlobalStatus||wf.globStat||row&&row['Statut Global (WFs)']), step=clean(row&&row.extractedCurrentStep||wf.step), all=status+' '+step;
+    const hasGlobal=!!status&&!/^[-—]+$/.test(status);
     let invalid=false,closed=false,returned=false;
-    try{invalid=typeof isWorkflowInvalidStatus==='function'&&isWorkflowInvalidStatus(all);}catch(e){}
-    try{closed=typeof isWorkflowClosedStatus==='function'&&isWorkflowClosedStatus(all);}catch(e){}
-    if(!invalid)invalid=/(INVALID|INVALIDE|INVALIDATED|CADUC|ANNULE|ANNULÉ|VOID)/i.test(all);
-    if(!closed)closed=/(FERME|FERMÉ|CLOTUR|CLÔTUR|CLOSED|COMPLET|COMPLETED|TERMINE|TERMINÉ)/i.test(all)||!!(wf.dateCl||row&&row.extractedWfClosedDate||row&&row.extractedClosedDate);
+    try{invalid=typeof isWorkflowInvalidStatus==='function'&&isWorkflowInvalidStatus(hasGlobal?status:all);}catch(e){}
+    if(!invalid)invalid=/(INVALID|INVALIDE|INVALIDATED|CADUC|ANNULE|ANNULÉ|VOID)/i.test(hasGlobal?status:all);
+    try{closed=typeof isWorkflowClosedStatus==='function'&&isWorkflowClosedStatus(hasGlobal?status:step);}catch(e){}
+    if(!closed)closed=/(FERME|FERMÉ|CLOTUR|CLÔTUR|CLOSED|COMPLET|COMPLETED|TERMINE|TERMINÉ)/i.test(hasGlobal?status:step);
     try{returned=typeof isWorkflowReturnedToInitiator==='function'&&isWorkflowReturnedToInitiator(wf);}catch(e){}
-    if(!returned)returned=/(CHEZ L.?INITIATEUR|RETOUR.*INITIATEUR|RETURNED TO INITIATOR|BACK TO INITIATOR|WAITING FOR INITIATOR|CHEZ L.?EMETTEUR|RETURNED TO SENDER)/i.test(all);
+    if(!returned)returned=/(CHEZ L.?INITIATEUR|RETOUR.*INITIATEUR|RETURNED TO INITIATOR|BACK TO INITIATOR|WAITING FOR INITIATOR|CHEZ L.?EMETTEUR|RETURNED TO SENDER)/i.test(step+' '+all);
+    // A report “Date de fin” is only a last-resort hint when the global status is absent.
+    // It must never close an explicitly OPEN / EN COURS workflow.
+    if(!hasGlobal&&!invalid&&!closed&&!returned&&(wf.dateCl||row&&row.extractedWfClosedDate||row&&row.extractedClosedDate))closed=true;
     if(invalid)return 'invalid';if(closed)return 'closed';if(returned)return 'returned';return 'open';
   }
+  function summarizeGroups(groups,source){
+    const out={total:groups.size,open:0,closed:0,invalid:0,returned:0,source};
+    groups.forEach(group=>{const kind=classify(latest(group));out[kind]++;});
+    return out;
+  }
+  function rawReportSummary(){
+    const groups=new Map(), source=window.__wfReportStatusById;
+    if(source instanceof Map)source.forEach(record=>{
+      if(!record||!record.id)return;
+      groups.set('id:'+String(record.id).replace(/^id:/,''),[{wfData:record}]);
+    });
+    return summarizeGroups(groups,'reportRaw');
+  }
+  function reportSummary(){
+    const groups=new Map();
+    try{
+      if(typeof wfMap!=='undefined'&&wfMap instanceof Map){
+        wfMap.forEach(obj=>{
+          if(!obj||typeof obj!=='object'||obj._unsafeWfRejected||obj._v112UnsafeWfRejected)return;
+          const row={wfData:obj};
+          const id=wfId(row);
+          if(!id||id==='—')return;
+          if(!groups.has(id))groups.set(id,[]);
+          groups.get(id).push(row);
+        });
+      }
+    }catch(e){}
+    return summarizeGroups(groups,'report');
+  }
   function calculate(){
+    const raw=rawReportSummary();
+    if(raw.total>0)return raw;
+    const report=reportSummary();
+    if(report.total>0)return report;
+    const imported=window.__wfImportCoverStats||(window.__lastWfImportStats&&window.__lastWfImportStats.coverStats);
+    const hasValue=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v));
+    if(imported&&hasValue(imported.total)&&Number(imported.total)>0){
+      return {total:Number(imported.total),open:Number(imported.open)||0,closed:Number(imported.closed)||0,invalid:Number(imported.invalid)||0,returned:Number(imported.returned)||0,source:'cover'};
+    }
     const groups=new Map();rows().forEach(row=>{const id=wfId(row);if(!id)return;if(!groups.has(id))groups.set(id,[]);groups.get(id).push(row);});
-    const out={total:groups.size,open:0,closed:0,invalid:0,returned:0};groups.forEach(group=>{const kind=classify(latest(group));out[kind]++;});return out;
+    return summarizeGroups(groups,'rows');
   }
   function set(id,value){const el=document.getElementById(id);if(el)el.textContent=Number(value||0).toLocaleString('fr-FR');}
   function note(id,value,total){const el=document.getElementById(id);if(el)el.textContent=total?((100*value/total).toLocaleString('fr-FR',{maximumFractionDigits:1})+' % du total'): '—';}
-  function render(){const c=calculate();set('v231-wf-total',c.total);set('v231-wf-open',c.open);set('v231-wf-closed',c.closed);set('v231-wf-invalid',c.invalid);set('v231-wf-returned',c.returned);note('v231-wf-total-note',c.total,c.total);note('v231-wf-open-note',c.open,c.total);note('v231-wf-closed-note',c.closed,c.total);note('v231-wf-invalid-note',c.invalid,c.total);note('v231-wf-returned-note',c.returned,c.total);const source=document.getElementById('v231-workflow-summary-source');if(source)source.textContent=c.total?('Dernier état connu · '+c.total.toLocaleString('fr-FR')+' WF uniques'):'En attente des données importées';window.__V232WorkflowCounts=c;}
+  function render(){const c=calculate();set('v231-wf-total',c.total);set('v231-wf-open',c.open);set('v231-wf-closed',c.closed);set('v231-wf-invalid',c.invalid);set('v231-wf-returned',c.returned);note('v231-wf-total-note',c.total,c.total);note('v231-wf-open-note',c.open,c.total);note('v231-wf-closed-note',c.closed,c.total);note('v231-wf-invalid-note',c.invalid,c.total);note('v231-wf-returned-note',c.returned,c.total);const source=document.getElementById('v231-workflow-summary-source');if(source)source.textContent=c.total?(c.source==='reportRaw'?'Rapport WF importé · statut global brut · '+c.total.toLocaleString('fr-FR')+' WF uniques':c.source==='report'?'Rapport WF importé · ID dédoublonnés · '+c.total.toLocaleString('fr-FR')+' WF uniques':c.source==='cover'?'Rapport WF importé · page de garde · '+c.total.toLocaleString('fr-FR')+' WF uniques':'Dernier état connu · '+c.total.toLocaleString('fr-FR')+' WF uniques'):'En attente du rapport WF « Vérifier le rapport »';window.__V239WorkflowCounts=c;}
   window.v231RefreshWorkflowSummary=render;window.v231CalculateWorkflowSummary=calculate;
   const prior=window.processAllData;if(typeof prior==='function'&&!prior.__v231WorkflowSummary){const wrapped=async function(){const out=await prior.apply(this,arguments);setTimeout(render,100);return out;};wrapped.__v231WorkflowSummary=true;window.processAllData=wrapped;try{processAllData=wrapped;}catch(e){}}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(render,400);setTimeout(render,1600);},{once:true});else{setTimeout(render,250);setTimeout(render,1300);}
@@ -29126,7 +29351,9 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   const confirmed=[
     {name:'Paul Deslandes',email:'',company:'BAATZ - Baatz',roles:'EN01',status:'Actif',id:'E2RNLPTNT3H5'},
     {name:'Claude Mauritz',email:'',company:'SCFL - CFLimmo',roles:'MOD',status:'Actif',id:'LCE9LHTGDMAY'},
-    {name:'Mehmetali Elhan',email:'',company:'SGI',roles:'',status:'Retiré',id:'TU92294WQ34PW7C9'}
+    {name:'Mehmetali Elhan',email:'',company:'SGI',roles:'',status:'Retiré',id:'TU92294WQ34PW7C9'},
+    {name:'Nicolas Dupont',email:'',company:'GALERE - Galere',roles:'',status:'Actif',id:'DNB2PX8QNQ5A8832'},
+    {name:'Denisa Pereirapinto',email:'',company:'GALERE - Galere',roles:'',status:'Actif',id:'SE2W2WJYABL5PMBW'}
   ];
   const directory=Array.isArray(window.membersDirectory)?window.membersDirectory:[];
   confirmed.forEach(entry=>{
@@ -29141,5 +29368,99 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
 })();
 </script>
 
+<script id="v244-adcrm-history-rules-lock">
+/* ==========================================================
+   V244 — Historique WF : règles ADCRM restaurées pour DEPB5
+   Source de vérité :
+   - Commentaires / rounds documentaires = reviews_review_comments + reviews_review_documents
+   - Notes de progression = reviews_workflow_notes + reviews_reviews
+   - Le rapport WF "Vérifier le rapport" confirme le WF mais n'écrase jamais
+     les champs d'historique calculés depuis Data Connector.
+   ========================================================== */
+(function(){
+  'use strict';
+  window.__v244AdcrmHistoryRules = true;
+
+  function clean(v){ return String(v == null ? '' : v).replace(/\r\n?/g,'\n').trim(); }
+  function keepHistory(row, snapshot){
+    if(!row || !snapshot) return;
+    if(clean(snapshot.comments)) row.extractedComments = snapshot.comments;
+    if(clean(snapshot.rounds)) row.extractedWfRoundsHistory = snapshot.rounds;
+    if(clean(snapshot.notes)) row.extractedWfProgressNotes = snapshot.notes;
+    if(clean(snapshot.rounds)) row.roundsHistory = snapshot.rounds;
+    if(clean(snapshot.notes)) row.workflowNotes = snapshot.notes;
+    if(row.wfData && typeof row.wfData === 'object'){
+      if(clean(snapshot.rounds)) row.wfData.historyRounds = snapshot.rounds;
+      if(clean(snapshot.notes)) row.wfData.progressNotes = snapshot.notes;
+    }
+  }
+  function rows(){
+    try { if(Array.isArray(processedData)) return processedData; } catch(e) {}
+    return Array.isArray(window.processedData) ? window.processedData : [];
+  }
+  function snapshotRows(){
+    const map = new Map();
+    rows().forEach((r,i)=>map.set(r,{
+      comments: clean(r.extractedComments || (r.wfData&&r.wfData.comments)),
+      rounds: clean(r.extractedWfRoundsHistory || r.roundsHistory || (r.wfData&&r.wfData.historyRounds)),
+      notes: clean(r.extractedWfProgressNotes || r.workflowNotes || (r.wfData&&r.wfData.progressNotes))
+    }));
+    return map;
+  }
+  function restore(map){ if(!map) return; rows().forEach(r=>keepHistory(r,map.get(r))); }
+
+  // V112 est conservé pour la sécurité WF, mais ne doit jamais effacer les données Data Connector.
+  const oldSanitize = window.v112SanitizeWorkflowRows;
+  if(typeof oldSanitize === 'function' && !oldSanitize.__v244Wrapped){
+    const wrapped=function(){ const snap=snapshotRows(); const out=oldSanitize.apply(this,arguments); restore(snap); return out; };
+    wrapped.__v244Wrapped=true; wrapped.__v244Original=oldSanitize;
+    window.v112SanitizeWorkflowRows=wrapped;
+  }
+
+  // Recalcul natif ADCRM après import des quatre CSV.
+  const oldHistoryImport = window.extractReviewHistoryFromCsvRows || (typeof extractReviewHistoryFromCsvRows==='function' ? extractReviewHistoryFromCsvRows : null);
+  if(typeof oldHistoryImport === 'function' && !oldHistoryImport.__v244Wrapped){
+    const wrapped=function(){
+      const out=oldHistoryImport.apply(this,arguments);
+      try { if(typeof v57BuildReviewHistoryIndexes==='function') v57BuildReviewHistoryIndexes(); } catch(e) {}
+      return out;
+    };
+    wrapped.__v244Wrapped=true; wrapped.__v244Original=oldHistoryImport;
+    window.extractReviewHistoryFromCsvRows=wrapped;
+    try { extractReviewHistoryFromCsvRows=wrapped; } catch(e) {}
+  }
+
+  // Statistiques visibles dans la console pour contrôle, sans changer les règles métier.
+  window.v244HistoryAudit=function(){
+    const list=rows();
+    const stats={rows:list.length,comments:0,rounds:0,notes:0};
+    list.forEach(r=>{
+      if(clean(r.extractedComments)) stats.comments++;
+      if(clean(r.extractedWfRoundsHistory)) stats.rounds++;
+      if(clean(r.extractedWfProgressNotes)) stats.notes++;
+    });
+    console.info('[V244 ADCRM history rules]',stats,window.__reviewHistoryStats||{});
+    return stats;
+  };
+
+  try { document.title=document.title.replace(/V\d+/i,'V244'); } catch(e) {}
+  console.info('[V244] Règles ADCRM restaurées pour Commentaires / Rounds WF / Notes progression.');
+})();
+</script>
+
+<script id="v245-ui-history-import-fix">
+/* V245 — UI + import CSV historique
+   - libellé visible : Commentaires
+   - suppression du faux toast rouge lorsque les CSV sont effectivement reconnus. */
+(function(){
+  try { document.title=document.title.replace(/V\d+/i,'V245'); } catch(e) {}
+  console.info('[V245] Libellé Commentaires simplifié et diagnostic CSV historique corrigé.');
+})();
+</script>
+
+
+<script id="v246-returned-initiator-marker">
+window.__DEPB5_V246_RETURNED_INITIATOR_RULES__ = true;
+</script>
 </body>
 </html>
