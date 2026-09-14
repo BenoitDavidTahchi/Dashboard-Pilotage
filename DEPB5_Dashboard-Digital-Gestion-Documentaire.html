@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CFLImmo - Dashboard Documentaire DEPB5 - V241</title>
+    <title>CFLImmo - Dashboard Documentaire DEPB5 - V246</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com">
 
@@ -3260,7 +3260,7 @@
             { id: 'wfApprover', label: 'Approb. final', width: 90, align: 'center', filterType: 'search' },
             { id: 'statut', label: 'Statut', width: 100, align: 'left', filterType: 'statut' },
             { id: 'path', label: 'Emplacement / Lot', width: 150, align: 'left', filterType: 'lot' },
-            { id: 'comments', label: 'Commentaires (dernier round)', width: 180, align: 'left', filterType: 'search' },
+            { id: 'comments', label: 'Commentaires', width: 180, align: 'left', filterType: 'search' },
             { id: 'wfRoundsHistory', label: 'Rounds WF', width: 220, align: 'left', filterType: 'search' },
             { id: 'wfProgressNotes', label: 'Notes WF', width: 220, align: 'left', filterType: 'search' },
         ];
@@ -3796,14 +3796,6 @@
             return {
                 raw: { comments: [], documents: [], reviews: [], notes: [] },
                 byEntity: new Map(),
-                // V239 : identité composée review_id + fichier. Un même VFROOT peut
-                // appartenir à plusieurs workflows et ne doit jamais être écrasé.
-                byReviewEntity: new Map(),
-                ambiguousEntities: new Set(),
-                // V239 : fallbacks stricts limités à la même review.
-                byReviewFileName: new Map(),
-                ambiguousReviewFileNames: new Set(),
-                byReviewFiles: new Map(),
                 byReviewId: new Map(),
                 byReviewUrl: new Map(),
                 byWorkflowNumber: new Map(),
@@ -3822,11 +3814,6 @@
             return {
                 raw: s.raw || { comments: [], documents: [], reviews: [], notes: [] },
                 byEntity: Array.from((s.byEntity || new Map()).entries()),
-                byReviewEntity: Array.from((s.byReviewEntity || new Map()).entries()),
-                ambiguousEntities: Array.from(s.ambiguousEntities || []),
-                byReviewFileName: Array.from((s.byReviewFileName || new Map()).entries()),
-                ambiguousReviewFileNames: Array.from(s.ambiguousReviewFileNames || []),
-                byReviewFiles: Array.from((s.byReviewFiles || new Map()).entries()),
                 byReviewId: Array.from((s.byReviewId || new Map()).entries()),
                 byReviewUrl: Array.from((s.byReviewUrl || new Map()).entries()),
                 byWorkflowNumber: Array.from((s.byWorkflowNumber || new Map()).entries()),
@@ -3840,11 +3827,6 @@
             if (!serialized) return s;
             s.raw = serialized.raw || s.raw;
             s.byEntity = new Map(serialized.byEntity || []);
-            s.byReviewEntity = new Map(serialized.byReviewEntity || []);
-            s.ambiguousEntities = new Set(serialized.ambiguousEntities || []);
-            s.byReviewFileName = new Map(serialized.byReviewFileName || []);
-            s.ambiguousReviewFileNames = new Set(serialized.ambiguousReviewFileNames || []);
-            s.byReviewFiles = new Map(serialized.byReviewFiles || []);
             s.byReviewId = new Map(serialized.byReviewId || []);
             s.byReviewUrl = new Map(serialized.byReviewUrl || []);
             s.byWorkflowNumber = new Map(serialized.byWorkflowNumber || []);
@@ -3854,18 +3836,7 @@
         }
 
         function v57NormalizeCsvKey(k) {
-            /* V240 : les CSV Autodesk exportés par Data Connector sont encodés
-               en UTF-8 avec BOM. Sur un objet issu de PapaParse, ce caractère
-               invisible peut rester devant la première colonne (\uFEFFid) et
-               rendre les ID des reviews/documents introuvables. On normalise
-               aussi les variantes camelCase, accentuées ou ponctuées. */
-            return String(k || '')
-                .replace(/^\uFEFF+/, '')
-                .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                .trim().toLowerCase()
-                .replace(/[^a-z0-9]+/g, '_')
-                .replace(/^_+|_+$/g, '');
+            return String(k || '').trim().toLowerCase().replace(/\s+/g, '_');
         }
 
         function v57Cell(row, names) {
@@ -3914,20 +3885,6 @@
                 add(`__VFROOT__${vf2[0].replace(/\?version=\d+$/i, '').toUpperCase()}`);
             }
             return out.filter(Boolean);
-        }
-
-        function v57FileNameKeys(value) {
-            let raw = String(value || '').trim();
-            if (!raw) return [];
-            try { raw = decodeURIComponent(raw); } catch (e) {}
-            raw = raw.replace(/\\/g, '/').split(/[?#]/)[0];
-            raw = raw.split('/').filter(Boolean).pop() || raw;
-            raw = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                .replace(/[’']/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
-            // Sécurité : le nom complet avec extension est obligatoire, afin de ne
-            // jamais mélanger par exemple un PDF et un ZIP portant le même radical.
-            if (!raw || !/\.[A-Z0-9]{1,10}$/.test(raw)) return [];
-            return [`__FILENAME__${raw}`];
         }
 
         function v57FormatDate(value) {
@@ -4015,13 +3972,6 @@
                 if (m) {
                     flush();
                     current = { author: m[1].trim(), bodyLines: [m[2] || ''] };
-                } else if (/^\s*(?:ROUND|TOUR|CYCLE)\s*#?\s*\d+\b/i.test(String(line || ''))) {
-                    // Les en-têtes de round ne font jamais partie du corps du
-                    // commentaire précédent. Sans cette coupure, « ROUND 2 »
-                    // était concaténé au dernier texte du ROUND 1 et faussait
-                    // le rapprochement fichier ↔ commentaires.
-                    flush();
-                    current = null;
                 } else if (current) {
                     current.bodyLines.push(line);
                 }
@@ -4046,9 +3996,6 @@
                 if (m) {
                     flush();
                     current = { code: m[1].trim(), bodyLines: [m[2] || ''] };
-                } else if (/^\s*(?:ROUND|TOUR|CYCLE)\s*#?\s*\d+\b/i.test(String(line || ''))) {
-                    flush();
-                    current = null;
                 } else if (current) {
                     current.bodyLines.push(line);
                 }
@@ -4107,45 +4054,6 @@
             };
         }
 
-        /* V240 : review_documents ne contient pas toujours le nom du fichier.
-           Lorsque le rapport WF n'expose pas non plus l'URN, on peut cependant
-           établir le lien de manière sûre à l'intérieur du même workflow grâce
-           aux textes exacts des commentaires du dernier round. Le rapprochement
-           n'est accepté que si un seul fichier historique obtient le meilleur
-           score ; aucune égalité n'est résolue arbitrairement. */
-        function v240HistoryCommentNorms(value) {
-            const entries = (typeof v58ExtractCommentAuthors === 'function')
-                ? v58ExtractCommentAuthors(value || '')
-                : [];
-            return new Set(entries.map(entry => String(entry.norm || '').trim()).filter(Boolean));
-        }
-
-        function v240FindHistoryByCurrentComments(state, reviewId, currentComments, fileNameKeys) {
-            if (!state || !(state.byReviewFiles instanceof Map) || !reviewId) return null;
-            const wanted = v240HistoryCommentNorms(currentComments);
-            if (!wanted.size) return null;
-            const candidates = state.byReviewFiles.get(String(reviewId).trim()) || [];
-            if (candidates.length < 2) return candidates[0] || null;
-
-            const scored = candidates.map(entry => {
-                const available = v240HistoryCommentNorms(entry && entry.rounds);
-                let score = 0;
-                wanted.forEach(body => { if (available.has(body)) score++; });
-                return { entry, score };
-            }).filter(item => item.score > 0).sort((a,b) => b.score - a.score);
-
-            if (!scored.length) return null;
-            if (scored.length > 1 && scored[0].score === scored[1].score) return null;
-            const match = scored[0].entry;
-            (fileNameKeys || []).forEach(fileNameKey => {
-                const composite = `${reviewId}¦${fileNameKey}`;
-                if (!(state.ambiguousReviewFileNames instanceof Set) || !state.ambiguousReviewFileNames.has(composite)) {
-                    state.byReviewFileName.set(composite, match);
-                }
-            });
-            return match;
-        }
-
         function v57DetectReviewCsvType(rows, fileName) {
             const sample = rows && rows.length ? rows[0] : {};
             const keys = Object.keys(sample || {}).map(v57NormalizeCsvKey);
@@ -4164,22 +4072,13 @@
             const type = v57DetectReviewCsvType(cleanRows, fileName);
             if (!type) {
                 console.info('[Review History V81] Fichier ignoré (table non utilisée) :', fileName);
-                const ignoredBatch = window.__v239HistoryImportBatch;
-                if (ignoredBatch) (ignoredBatch.ignoredFiles || (ignoredBatch.ignoredFiles = [])).push(fileName || 'CSV sans nom');
-                return { type: '', rows: 0 };
+                return;
             }
-            const batch = window.__v239HistoryImportBatch;
-            if (batch && batch.types instanceof Set && !batch.types.has(type)) {
-                s.raw[type] = [];
-                batch.types.add(type);
-            }
-            s.raw[type] = (s.raw[type] || []).concat(cleanRows);
-            if (batch) {
-                batch.recognizedFiles = Number(batch.recognizedFiles || 0) + 1;
-                batch.recognizedRows = Number(batch.recognizedRows || 0) + cleanRows.length;
-            }
+            if (type === 'comments') s.raw.comments = s.raw.comments.concat(cleanRows);
+            if (type === 'documents') s.raw.documents = s.raw.documents.concat(cleanRows);
+            if (type === 'notes') s.raw.notes = s.raw.notes.concat(cleanRows);
+            if (type === 'reviews') s.raw.reviews = s.raw.reviews.concat(cleanRows);
             v57BuildReviewHistoryIndexes();
-            return { type, rows: cleanRows.length };
         }
 
         function v57BuildReviewHistoryIndexes() {
@@ -4187,35 +4086,12 @@
             const commentsByDoc = new Map();
             const notesByReview = new Map();
             const reviewsById = new Map();
-            const roundStartsByReview = new Map();
-            let indexedComments = 0, indexedDocuments = 0, indexedReviews = 0, indexedNotes = 0;
-
-            const registerRoundStart = (reviewId, roundValue, dateValue, source, priority) => {
-                const id = String(reviewId || '').trim();
-                const roundMatch = String(roundValue || '').match(/\d+/);
-                const round = roundMatch ? String(Number(roundMatch[0])) : '';
-                const rawDate = String(dateValue || '').trim();
-                const ts = rawDate ? Date.parse(rawDate) : 0;
-                if (!id || !round || !ts) return;
-                if (!roundStartsByReview.has(id)) roundStartsByReview.set(id, new Map());
-                const byRound = roundStartsByReview.get(id);
-                const existing = byRound.get(round);
-                if (!existing || priority > existing.priority || (priority === existing.priority && ts < existing.ts)) {
-                    byRound.set(round, { value: rawDate, ts, source, priority });
-                }
-            };
-            const roundStartInfo = (reviewId, roundValue) => {
-                const roundMatch = String(roundValue || '').match(/\d+/);
-                const round = roundMatch ? String(Number(roundMatch[0])) : '';
-                return round && roundStartsByReview.has(reviewId) ? (roundStartsByReview.get(reviewId).get(round) || null) : null;
-            };
 
             (s.raw.comments || []).forEach(r => {
                 if (String(v57Cell(r, ['deleted_at']) || '').trim()) return;
                 const docId = v57Cell(r, ['review_document_id']);
                 const txt = v57Cell(r, ['text']);
                 if (!docId || !txt) return;
-                indexedComments++;
                 if (!commentsByDoc.has(docId)) commentsByDoc.set(docId, []);
                 commentsByDoc.get(docId).push({
                     created_by: v57Cell(r, ['created_by']),
@@ -4231,7 +4107,6 @@
                 const reviewId = v57Cell(r, ['review_id']);
                 const note = v57Cell(r, ['note']);
                 if (!reviewId || !note) return;
-                indexedNotes++;
                 if (!notesByReview.has(reviewId)) notesByReview.set(reviewId, []);
                 notesByReview.get(reviewId).push({
                     created_by: v57Cell(r, ['created_by']),
@@ -4240,13 +4115,11 @@
                     updated_at: v57Cell(r, ['updated_at']),
                     round_num: v57Cell(r, ['round_num']) || '1'
                 });
-                registerRoundStart(reviewId, v57Cell(r, ['round_num']) || '1', v57Cell(r, ['created_at']) || v57Cell(r, ['updated_at']), 'première note du round', 100);
             });
 
             (s.raw.reviews || []).forEach(r => {
                 const id = v57Cell(r, ['id']);
                 if (!id) return;
-                indexedReviews++;
                 reviewsById.set(id, {
                     id,
                     sequence_id: v57Cell(r, ['sequence_id']),
@@ -4258,15 +4131,9 @@
                     finished_at: v57Cell(r, ['finished_at']),
                     started_at: v57Cell(r, ['started_at'])
                 });
-                registerRoundStart(id, '1', v57Cell(r, ['started_at']), 'démarrage du workflow / round 1', 400);
             });
 
             s.byEntity = new Map();
-            s.byReviewEntity = new Map();
-            s.ambiguousEntities = new Set();
-            s.byReviewFileName = new Map();
-            s.ambiguousReviewFileNames = new Set();
-            s.byReviewFiles = new Map();
             s.byReviewId = new Map();
             s.byReviewUrl = new Map();
             s.byWorkflowNumber = new Map();
@@ -4290,6 +4157,10 @@
             */
 
             const fileBuckets = new Map();
+            // V246 — index complémentaire par review pour les WF retournés à l'initiateur.
+            // Dans les exports Autodesk, un retour crée un nouveau review_document pour le même VFROOT,
+            // souvent sans commentaire dans le round actif. On conserve donc les rounds même vides.
+            const fileEntriesByReview = new Map();
 
             const addToSet = (set, values) => {
                 (values || []).forEach(v => { if (v) set.add(v); });
@@ -4302,10 +4173,9 @@
             };
 
             (s.raw.documents || []).forEach(d => {
-                const docId = v57Cell(d, ['id', 'review_document_id', 'document_id']);
-                const reviewId = v57Cell(d, ['review_id', 'reviewid']);
-                const urn = v57Cell(d, ['versioned_urn', 'version_urn', 'document_version_urn', 'urn']);
-                const documentName = v57Cell(d, ['file_name', 'filename', 'document_name', 'documentname', 'original_name', 'display_name', 'name', 'title', 'file_path', 'path']);
+                const docId = v57Cell(d, ['id']);
+                const reviewId = v57Cell(d, ['review_id']);
+                const urn = v57Cell(d, ['versioned_urn']);
 
                 // V81 : lorsque le statut documentaire contient approverUserId/approverUserName,
                 // on l'utilise comme dictionnaire complémentaire ID Autodesk -> nom affichable.
@@ -4320,9 +4190,6 @@
                 }
 
                 if (!docId || !reviewId || !urn) return;
-                indexedDocuments++;
-
-                registerRoundStart(reviewId, v57Cell(d, ['round_num']) || '1', v57Cell(d, ['created_at']) || v57Cell(d, ['updated_at']), 'lancement du document dans le round', 300);
 
                 const keys = v57EntityKeys(urn);
                 const bucketKey = bucketKeyForDocument(reviewId, urn);
@@ -4332,26 +4199,78 @@
                     fileBuckets.set(bucketKey, {
                         reviewId,
                         keys: new Set(),
-                        fileNameKeys: new Set(),
-                        comments: []
+                        comments: [],
+                        rounds: new Set()
                     });
                 }
 
                 const bucket = fileBuckets.get(bucketKey);
                 addToSet(bucket.keys, keys);
-                addToSet(bucket.fileNameKeys, v57FileNameKeys(documentName));
+                const docRound = String(v57Cell(d, ['round_num']) || '').trim();
+                if (docRound) bucket.rounds.add(docRound);
 
                 const docComments = commentsByDoc.get(docId) || [];
                 bucket.comments.push(...docComments);
-                docComments.forEach(comment => registerRoundStart(reviewId, comment.round_num || '1', comment.created_at || comment.updated_at, 'premier commentaire du round', 200));
             });
 
             fileBuckets.forEach(bucket => {
                 const reviewId = bucket.reviewId;
                 const meta = reviewsById.get(reviewId) || {};
-                const roundsText = v57FormatGroupedRows(bucket.comments || [], 'comment');
-                const notesText = v57FormatGroupedRows(notesByReview.get(reviewId) || [], 'note');
-                const startInfo = roundStartInfo(reviewId, meta.current_round_num || '');
+                const statusNorm = String(meta.status || '').trim().toLowerCase();
+                const returnedToInitiator = /restart|waiting\s*for\s*initiator|return.*initiator|initiator/.test(statusNorm);
+                const currentRound = String(meta.current_round_num || '').trim();
+
+                let roundsText = v57FormatGroupedRows(bucket.comments || [], 'comment');
+                let notesText = v57FormatGroupedRows(notesByReview.get(reviewId) || [], 'note');
+                let lastCompletedComments = '';
+
+                if (returnedToInitiator) {
+                    // Autodesk crée généralement le nouveau round sans commentaires. On doit tout de même
+                    // matérialiser les rounds pour que l'utilisateur voie le retour à l'initiateur.
+                    const roundSet = new Set(Array.from(bucket.rounds || []));
+                    if (currentRound) roundSet.add(currentRound);
+                    (bucket.comments || []).forEach(c => {
+                        const r = String(c.round_num || c.roundNum || '').trim();
+                        if (r) roundSet.add(r);
+                    });
+                    const roundList = Array.from(roundSet).sort((a,b)=>(parseInt(a,10)||0)-(parseInt(b,10)||0));
+                    const blocks = [];
+                    let latestCompletedNum = -1;
+                    let latestCompletedBody = '';
+                    const currentNum = parseInt(currentRound,10) || 0;
+
+                    roundList.forEach(round => {
+                        const roundComments = (bucket.comments || []).filter(c => String(c.round_num || c.roundNum || '1').trim() === String(round));
+                        const formatted = v57FormatGroupedRows(roundComments, 'comment');
+                        if (formatted) {
+                            blocks.push(formatted);
+                            const n = parseInt(round,10) || 0;
+                            // Pour un WF retourné, le dernier round terminé est normalement le round précédent.
+                            if ((!currentNum || n < currentNum) && n >= latestCompletedNum) {
+                                latestCompletedNum = n;
+                                latestCompletedBody = formatted.replace(new RegExp('^ROUND\\s+'+String(round)+'\\s*\\n?', 'i'), '').trim();
+                            }
+                        } else {
+                            const n = parseInt(round,10) || 0;
+                            if (currentNum && n === currentNum) {
+                                blocks.push(`ROUND ${round}\n- [État WF] Retour à l’initiateur — nouveau round ouvert, en attente de l’initiateur.`);
+                            } else {
+                                blocks.push(`ROUND ${round}\n- [Information Autodesk] Aucun commentaire exporté pour ce round.`);
+                            }
+                        }
+                    });
+                    roundsText = v57CleanLongCellText(blocks.join('\n\n'));
+                    lastCompletedComments = latestCompletedBody || '[Information Autodesk] Aucun commentaire exporté pour le round précédent.';
+
+                    // Les workflow_notes de certains retours sont présentes mais leur champ note est vide.
+                    // La progression ne doit pas rester visuellement vide : on ajoute uniquement l'état déduit
+                    // de reviews.status = restarting, clairement marqué comme état WF et non comme commentaire utilisateur.
+                    if (currentRound) {
+                        const stateBlock = `ROUND ${currentRound}\n- [État WF] Workflow retourné à l’initiateur — en attente d’une nouvelle soumission.`;
+                        const hasCurrentRoundInNotes = new RegExp(`(^|\\n)ROUND\\s+${currentRound}(?:\\s|$)`, 'i').test(notesText || '');
+                        if (!hasCurrentRoundInNotes) notesText = v57CleanLongCellText([notesText, stateBlock].filter(Boolean).join('\n\n'));
+                    }
+                }
 
                 const entry = {
                     reviewId,
@@ -4361,62 +4280,51 @@
                     workflowName: meta.workflow_name || '',
                     reviewName: meta.review_name || '',
                     currentRound: meta.current_round_num || '',
-                    roundStartedAt: startInfo ? startInfo.value : '',
-                    roundStartSource: startInfo ? startInfo.source : '',
+                    reviewStatus: meta.status || '',
+                    returnedToInitiator,
+                    lastCompletedComments,
                     hasHistory: !!roundsText,
                     hasNotes: !!notesText,
-                    historyScope: 'file'
+                    historyScope: returnedToInitiator ? 'file-returned-to-initiator' : 'file'
                 };
 
-                if (!s.byReviewFiles.has(reviewId)) s.byReviewFiles.set(reviewId, []);
-                s.byReviewFiles.get(reviewId).push(entry);
-
-                (bucket.fileNameKeys || new Set()).forEach(fileNameKey => {
-                    const composite = `${reviewId}¦${fileNameKey}`;
-                    if (s.ambiguousReviewFileNames.has(composite)) return;
-                    const prior = s.byReviewFileName.get(composite);
-                    if (!prior) s.byReviewFileName.set(composite, entry);
-                    else if (prior !== entry) {
-                        s.byReviewFileName.delete(composite);
-                        s.ambiguousReviewFileNames.add(composite);
-                    }
-                });
-
-                (bucket.keys || new Set()).forEach(k => {
-                    // La correspondance fiable porte obligatoirement les deux identités :
-                    // review_id (workflow) ET clé du fichier. Le fallback fichier seul
-                    // n'est conservé que si cette clé n'existe que dans une seule review.
-                    s.byReviewEntity.set(`${reviewId}¦${k}`, entry);
-                    if (s.ambiguousEntities.has(k)) return;
-                    const prior = s.byEntity.get(k);
-                    if (!prior) {
-                        s.byEntity.set(k, entry);
-                    } else if (String(prior.reviewId || '') !== String(reviewId || '')) {
-                        s.byEntity.delete(k);
-                        s.ambiguousEntities.add(k);
-                    }
-                });
+                (bucket.keys || new Set()).forEach(k => s.byEntity.set(k, entry));
+                if (!fileEntriesByReview.has(reviewId)) fileEntriesByReview.set(reviewId, []);
+                fileEntriesByReview.get(reviewId).push(entry);
             });
 
             reviewsById.forEach((meta, reviewId) => {
-                const notesText = v57FormatGroupedRows(notesByReview.get(reviewId) || [], 'note');
-                const startInfo = roundStartInfo(reviewId, meta.current_round_num || '');
+                const notesTextBase = v57FormatGroupedRows(notesByReview.get(reviewId) || [], 'note');
+                const statusNorm = String(meta.status || '').trim().toLowerCase();
+                const returnedToInitiator = /restart|waiting\s*for\s*initiator|return.*initiator|initiator/.test(statusNorm);
+                const fileEntries = fileEntriesByReview.get(reviewId) || [];
+                // V246 : si le WF retourné ne concerne qu'un seul fichier logique (même VFROOT sur plusieurs rounds),
+                // le fallback par ID/URL WF est sûr et peut transporter l'historique du fichier. Cela évite la perte
+                // des rounds quand l'URL entityId n'est pas disponible dans le journal des fichiers.
+                const singleReturnedFile = returnedToInitiator && fileEntries.length === 1 ? fileEntries[0] : null;
+                let notesText = singleReturnedFile ? (singleReturnedFile.notes || notesTextBase) : notesTextBase;
+                if (returnedToInitiator && meta.current_round_num) {
+                    const cr = String(meta.current_round_num).trim();
+                    const hasCurrentRoundInNotes = new RegExp(`(^|\\n)ROUND\\s+${cr}(?:\\s|$)`, 'i').test(notesText || '');
+                    if (!hasCurrentRoundInNotes) {
+                        const stateBlock = `ROUND ${cr}\n- [État WF] Workflow retourné à l’initiateur — en attente d’une nouvelle soumission.`;
+                        notesText = v57CleanLongCellText([notesText, stateBlock].filter(Boolean).join('\n\n'));
+                    }
+                }
                 const entry = {
                     reviewId,
                     sequenceId: meta.sequence_id || '',
-                    // V81 : volontairement vide en fallback WF.
-                    // Sans correspondance fichier/URN fiable, on évite de polluer la ligne avec
-                    // les commentaires de tous les documents du même workflow.
-                    rounds: '',
+                    rounds: singleReturnedFile ? (singleReturnedFile.rounds || '') : '',
                     notes: notesText,
                     workflowName: meta.workflow_name || '',
                     reviewName: meta.review_name || '',
                     currentRound: meta.current_round_num || '',
-                    roundStartedAt: startInfo ? startInfo.value : '',
-                    roundStartSource: startInfo ? startInfo.source : '',
-                    hasHistory: false,
+                    reviewStatus: meta.status || '',
+                    returnedToInitiator,
+                    lastCompletedComments: singleReturnedFile ? (singleReturnedFile.lastCompletedComments || '') : '',
+                    hasHistory: !!(singleReturnedFile && singleReturnedFile.rounds),
                     hasNotes: !!notesText,
-                    historyScope: 'workflow-notes-only'
+                    historyScope: singleReturnedFile ? 'returned-single-file-fallback' : 'workflow-notes-only'
                 };
 
                 s.byReviewId.set(v57ReviewUuidKey(reviewId), entry);
@@ -4430,147 +4338,59 @@
                 reviews: (s.raw.reviews || []).length,
                 notes: (s.raw.notes || []).length,
                 entities: s.byEntity.size,
-                reviewEntities: s.byReviewEntity.size,
-                ambiguousEntities: s.ambiguousEntities.size,
-                reviewFileNames: s.byReviewFileName.size,
-                ambiguousReviewFileNames: s.ambiguousReviewFileNames.size,
                 reviewIds: s.byReviewId.size,
-                fileBuckets: fileBuckets.size,
-                indexedComments,
-                indexedDocuments,
-                indexedReviews,
-                indexedNotes,
-                workflowsWithNotes: notesByReview.size
+                fileBuckets: fileBuckets.size
             };
-            const loadedSources = ['comments','documents','reviews','notes'].filter(type => (s.raw[type] || []).length > 0);
-            const sourceLabels = {comments:'review_comments',documents:'review_documents',reviews:'reviews',notes:'workflow_notes'};
-            const missingSources = ['comments','documents','reviews','notes'].filter(type => !loadedSources.includes(type)).map(type => sourceLabels[type]);
-            s.stats.loadedSources = loadedSources.length;
-            s.stats.missingSources = missingSources;
             window.__reviewHistoryStats = s.stats;
-            window.__v239HistoryImportCoverage = {loaded:loadedSources.length,total:4,missing:missingSources.slice(),linkedFiles:s.stats.fileBuckets || 0,indexedComments,indexedDocuments,indexedReviews,indexedNotes};
-            window.__v240HistoryImportCoverage = window.__v239HistoryImportCoverage;
             document.querySelectorAll('.status-history').forEach(el => {
                 el.classList.remove('hidden');
-                const complete = loadedSources.length === 4 && indexedReviews > 0 && indexedDocuments > 0;
-                const detail = complete
-                    ? `4/4 sources chargées · ${indexedComments}/${s.stats.comments} commentaires indexés · ${indexedNotes}/${s.stats.notes} notes indexées · ${s.stats.fileBuckets || 0} fichier(s) historiques · ${notesByReview.size} WF avec notes`
-                    : `${loadedSources.length}/4 sources chargées · manquant : ${missingSources.join(', ') || 'aucun fichier exploitable'}`;
-                el.innerHTML = `<div class="flex items-center gap-1"><i data-lucide="${complete ? 'check' : 'triangle-alert'}" class="w-3 h-3"></i> Historique WF ${complete ? 'prêt' : 'incomplet'}</div><div class="text-[10px] text-slate-500 dark:text-slate-400 font-normal mt-1">${detail}</div>`;
+                el.innerHTML = `<div class="flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> Historique WF chargé (${s.stats.comments} commentaires / ${s.stats.notes} notes / ${s.stats.fileBuckets || 0} fichier(s) liés)</div><div class="text-[10px] text-slate-500 dark:text-slate-400 font-normal mt-1">V81 : commentaires filtrés par fichier, sans cadres de notes/commentaires Excel automatiques.</div>`;
             });
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
         function v57FindHistoryForDocument(params) {
             const s = v57EnsureReviewHistoryState();
-            const entityKeys = [];
-            const addEntity = value => v57EntityKeys(value).forEach(k => { if (k && !entityKeys.includes(k)) entityKeys.push(k); });
+            const checks = [];
+            const addKey = (kind, key) => { if (key) checks.push([kind, key]); };
+            const addEntity = (value) => v57EntityKeys(value).forEach(k => addKey('entity', k));
             addEntity(params && params.fileUrl);
             addEntity(params && params.directFileUrl);
             addEntity(params && params.pathUrl);
             addEntity(params && params.wfData && params.wfData.fileUrl);
-
-            const reviewIds = new Set();
-            const workflowFallbacks = [];
-            const remember = entry => {
-                if (!entry) return;
-                if (!workflowFallbacks.includes(entry)) workflowFallbacks.push(entry);
-                if (entry.reviewId) reviewIds.add(String(entry.reviewId).trim());
-            };
-            const addReviewIdFromRaw = value => {
-                let raw = String(value || '').trim();
-                if (!raw) return;
-                try { raw = decodeURIComponent(raw); } catch (e) {}
-                const fromUrl = raw.match(/\/reviews\/projects\/[^/?#]+\/([0-9a-f-]{20,})/i);
-                if (fromUrl) reviewIds.add(fromUrl[1]);
-                else if (/^[0-9a-f-]{20,}$/i.test(raw)) reviewIds.add(raw);
-            };
-
             const wfUrlCandidates = [
                 params && params.workflowUrl,
                 params && params.wfData && params.wfData.wfUrl,
                 params && params.wfData && params.wfData.reviewId
             ].filter(Boolean);
-            wfUrlCandidates.forEach(value => {
-                addReviewIdFromRaw(value);
-                try { remember(s.byReviewUrl.get(accReviewUrlKey(value))); } catch (e) {}
-                remember(s.byReviewId.get(v57ReviewUuidKey(value)));
+            wfUrlCandidates.forEach(u => {
+                try {
+                    const k = accReviewUrlKey(u);
+                    if (k) addKey('reviewUrl', k);
+                } catch (e) {}
+                addKey('reviewId', v57ReviewUuidKey(u));
             });
-
             const wfNumber = params && params.wfData ? (params.wfData.id || '') : '';
-            const wfNumberKey = v57WorkflowNumberKey(wfNumber);
-            if (wfNumberKey) remember(s.byWorkflowNumber.get(wfNumberKey));
-
-            // V239 : priorité absolue à la paire workflow + fichier.
-            // Un fichier réutilisé dans plusieurs workflows ne peut donc plus recevoir
-            // les commentaires du dernier workflow importé.
-            for (const reviewId of reviewIds) {
-                for (const entityKey of entityKeys) {
-                    const exact = s.byReviewEntity instanceof Map
-                        ? s.byReviewEntity.get(`${reviewId}¦${entityKey}`)
-                        : null;
-                    if (exact) return exact;
-                }
+            addKey('workflowNumber', v57WorkflowNumberKey(wfNumber));
+            for (const [kind, key] of checks) {
+                const obj = kind === 'entity' ? s.byEntity.get(key)
+                    : kind === 'reviewUrl' ? s.byReviewUrl.get(key)
+                    : kind === 'workflowNumber' ? s.byWorkflowNumber.get(key)
+                    : s.byReviewId.get(key);
+                if (obj) return obj;
             }
-
-            // Deuxième niveau sûr : même review_id + nom complet avec extension.
-            const fileNameKeys = [];
-            [
-                params && params.exactName,
-                params && params.nomComplet,
-                params && params.wfData && params.wfData._wfSourceFileName
-            ].forEach(value => v57FileNameKeys(value).forEach(key => { if (!fileNameKeys.includes(key)) fileNameKeys.push(key); }));
-            for (const reviewId of reviewIds) {
-                for (const fileNameKey of fileNameKeys) {
-                    const composite = `${reviewId}¦${fileNameKey}`;
-                    if (s.ambiguousReviewFileNames instanceof Set && s.ambiguousReviewFileNames.has(composite)) continue;
-                    const exactByName = s.byReviewFileName instanceof Map ? s.byReviewFileName.get(composite) : null;
-                    if (exactByName) return exactByName;
-                }
-            }
-
-            // V240 : pont strict par commentaires du rapport WF lorsque les CSV
-            // ne fournissent aucune colonne de nom de fichier.
-            const currentComments = params && params.wfData ? (params.wfData.comments || '') : '';
-            for (const reviewId of reviewIds) {
-                const exactByComments = v240FindHistoryByCurrentComments(s, reviewId, currentComments, fileNameKeys);
-                if (exactByComments) return exactByComments;
-            }
-
-            // Troisième niveau sûr : la review ne contient qu'un seul document.
-            // Aucun choix entre plusieurs fichiers n'est alors nécessaire.
-            for (const reviewId of reviewIds) {
-                const entries = s.byReviewFiles instanceof Map ? (s.byReviewFiles.get(reviewId) || []) : [];
-                if (entries.length === 1) return entries[0];
-            }
-
-            const hasWorkflowIdentity = !!(reviewIds.size || wfNumberKey || wfUrlCandidates.length);
-            if (hasWorkflowIdentity) {
-                // Une identité WF connue sans paire fichier exacte ne doit jamais tomber
-                // sur l'historique d'un autre WF. Le fallback ne contient que les notes WF.
-                return workflowFallbacks[0] || {};
-            }
-
-            // Fallback fichier seul uniquement lorsque la clé est univoque entre reviews.
-            for (const entityKey of entityKeys) {
-                if (s.ambiguousEntities instanceof Set && s.ambiguousEntities.has(entityKey)) continue;
-                const unique = s.byEntity.get(entityKey);
-                if (unique) return unique;
-            }
-            return workflowFallbacks[0] || {};
+            return {};
         }
 
         function v57AttachHistoryToWorkflowObject(wfObj, params) {
             if (!wfObj) return wfObj;
             const h = v57FindHistoryForDocument(Object.assign({}, params || {}, { wfData: wfObj }));
-            if (h && (h.rounds || h.notes || h.currentRound || h.roundStartedAt)) {
+            if (h && (h.rounds || h.notes)) {
                 wfObj.historyRounds = h.rounds || wfObj.historyRounds || '';
                 wfObj.progressNotes = h.notes || wfObj.progressNotes || '';
                 if (!wfObj.wfName && h.workflowName) wfObj.wfName = h.workflowName;
                 if (!wfObj.id && h.sequenceId) wfObj.id = h.sequenceId;
                 if (!wfObj.currentRound && h.currentRound) wfObj.currentRound = h.currentRound;
-                if (!wfObj.roundStartedAt && h.roundStartedAt) wfObj.roundStartedAt = h.roundStartedAt;
-                if (!wfObj.roundStartSource && h.roundStartSource) wfObj.roundStartSource = h.roundStartSource;
             }
             return wfObj;
         }
@@ -4589,12 +4409,27 @@
                 if (done >= files.length) {
                     if (window.__v239HistoryImportBatch === importBatch) window.__v239HistoryImportBatch = null;
                     v57BuildReviewHistoryIndexes();
-                    const coverage = window.__v240HistoryImportCoverage || window.__v239HistoryImportCoverage || {};
-                    const ready = coverage.loaded === 4 && Number(coverage.indexedReviews || 0) > 0 && Number(coverage.indexedDocuments || 0) > 0;
+
+                    // V245 : la décision du toast repose sur les données réellement chargées,
+                    // pas sur recognizedFiles initialisé à 0 dans l'ancienne version.
+                    const state = v57EnsureReviewHistoryState();
+                    const loadedTypes = ['comments','documents','notes','reviews'].filter(type =>
+                        state.raw && Array.isArray(state.raw[type]) && state.raw[type].length > 0
+                    );
+                    const stats = state.stats || window.__reviewHistoryStats || {};
+                    const ready = loadedTypes.length === 4
+                        && Number(stats.reviews || 0) > 0
+                        && Number(stats.documents || 0) > 0;
+
                     if (typeof window.showToast === 'function') {
-                        if (ready) window.showToast(`Historique WF ACC importé : ${importBatch.recognizedRows} lignes lues.`, 'success');
-                        else if (importBatch.recognizedFiles > 0) window.showToast(`Historique WF incomplet : ${importBatch.recognizedFiles}/4 source(s) reconnue(s).`, 'warning');
-                        else window.showToast('Aucun CSV d’historique WF exploitable n’a été reconnu.', 'error');
+                        if (ready) {
+                            const totalRows = Number(stats.comments || 0) + Number(stats.documents || 0) + Number(stats.notes || 0) + Number(stats.reviews || 0);
+                            window.showToast(`Historique WF ACC importé : 4/4 sources reconnues · ${totalRows} lignes indexées.`, 'success');
+                        } else if (importBatch.recognizedFiles > 0 || loadedTypes.length > 0) {
+                            window.showToast(`Historique WF partiel : ${loadedTypes.length}/4 source(s) disponible(s). Les données reconnues sont conservées.`, 'warning');
+                        } else {
+                            window.showToast('Aucun CSV d’historique WF exploitable n’a été reconnu.', 'error');
+                        }
                     }
                     const btn = document.getElementById('btn-generate');
                     if (btn && rawLogData.length > 0) btn.removeAttribute('disabled');
@@ -4606,7 +4441,18 @@
                     skipEmptyLines: true,
                     complete: (results) => {
                         if (results && Array.isArray(results.errors) && results.errors.length) importBatch.parserErrors.push(...results.errors.map(err => ({file:file.name,code:err.code || '',message:err.message || ''})));
-                        try { extractReviewHistoryFromCsvRows(results.data || [], file.name); }
+                        const parsedRows = (results && Array.isArray(results.data)) ? results.data : [];
+                        const nonEmptyRows = parsedRows.filter(r => r && Object.values(r).some(v => String(v == null ? '' : v).trim() !== ''));
+                        let detectedType = '';
+                        try { detectedType = v57DetectReviewCsvType(nonEmptyRows, file.name); } catch(e) {}
+                        if (detectedType) {
+                            importBatch.recognizedFiles++;
+                            importBatch.recognizedRows += nonEmptyRows.length;
+                            importBatch.types.add(detectedType);
+                        } else {
+                            importBatch.ignoredFiles.push(file.name);
+                        }
+                        try { extractReviewHistoryFromCsvRows(parsedRows, file.name); }
                         catch (e) { console.error('[Review History V81] erreur import', file.name, e); }
                         finish();
                     },
@@ -4695,18 +4541,18 @@
                 const file = findCol(row, [/^NOM DU FICHIER$/, /^FILE NAME$/, /^FILENAME$/, /^DOCUMENT NAME$/, /^DATEINAME$/, /^DATEI NAME$/, /^DOKUMENTNAME$/, /^NAME DER DATEI$/], [/REVUE/, /REVIEW/, /UBERPRUFUNG/, /PRUFUNG/]);
                 const comments = findCol(row, [/^COMMENTAIRES?$/, /^COMMENTS?$/, /^OBSERVATIONS?$/, /^KOMMENTARE?$/, /^BEMERKUNGEN?$/, /^ANMERKUNGEN?$/]);
                 const dateC = findCol(row, [/^DATE DE CREATION$/, /^DATE CREATION$/, /^CREATED$/, /^CREATION DATE$/, /^CREATED ON$/, /^ERSTELLUNGSDATUM$/, /^ERSTELLT$/, /^ERSTELLT AM$/, /^ERSTELLDATUM$/]);
-                const dateE = findCol(row, [/^PROCHAINE ETAPE DUE LE$/, /^NEXT STEP DUE ON$/, /^DUE DATE$/, /^ECHEANCE$/, /^DEADLINE$/, /^FALLIGKEITSDATUM$/, /^FAELLIGKEITSDATUM$/, /^FALLIG AM$/, /^FAELLIG AM$/, /^FRIST$/, /^NACHSTER SCHRITT FALLIG AM$/, /^NAECHSTER SCHRITT FAELLIG AM$/]);
-                const dateCl = findCol(row, [/^DATE DE FIN$/, /^END DATE$/, /^DATE CLOTURE$/, /^DATE DE CLOTURE$/, /^CLOSED DATE$/, /^COMPLETED$/, /^ENDDATUM$/, /^ABSCHLUSSDATUM$/, /^ABGESCHLOSSEN AM$/, /^FERTIGGESTELLT$/, /^BEENDET AM$/]);
+                const dateE = findCol(row, [/^PROCHAINE ACTION DUE LE$/, /^PROCHAINE ACTION ECHUE LE$/, /^PROCHAINE ETAPE DUE LE$/, /^NEXT ACTION DUE$/, /^NEXT ACTION DUE ON$/, /^NEXT STEP DUE ON$/, /^DUE DATE$/, /^ECHEANCE$/, /^DEADLINE$/, /^FALLIGKEITSDATUM$/, /^FAELLIGKEITSDATUM$/, /^FALLIG AM$/, /^FAELLIG AM$/, /^FRIST$/, /^NACHSTER SCHRITT FALLIG AM$/, /^NAECHSTER SCHRITT FAELLIG AM$/]);
+                const dateCl = findCol(row, [/^DATE DE FIN$/, /^END DATE$/, /^FINISHED ON$/, /^FINISHED$/, /^DATE CLOTURE$/, /^DATE DE CLOTURE$/, /^CLOSED DATE$/, /^COMPLETED$/, /^ENDDATUM$/, /^ABSCHLUSSDATUM$/, /^ABGESCHLOSSEN AM$/, /^FERTIGGESTELLT$/, /^BEENDET AM$/]);
 
                 const score = [id, status, wfName, step, file, comments, dateC, dateE, dateCl].filter(x => x !== undefined).length;
                 if (score >= 6 && id !== undefined && wfName !== undefined && file !== undefined) {
                     headerRowIdx = r;
                     colMap = {
                         id, globStat: status, wfName, step, file, comments, dateC, dateE, dateCl,
-                        cycle: findCol(row, [/^CYCLE ACTUEL$/, /^CURRENT CYCLE$/, /^AKTUELLER ZYKLUS$/]),
+                        cycle: findCol(row, [/^ROUND ACTUEL$/, /^CURRENT ROUND$/, /^CYCLE ACTUEL$/, /^CURRENT CYCLE$/, /^AKTUELLER ZYKLUS$/]),
                         reviewName: findCol(row, [/^NOM DE LA REVUE$/, /^REVIEW NAME$/, /^NAME DER UBERPRUFUNG$/, /^NAME DER PRUFUNG$/, /^UBERPRUFUNGSNAME$/, /^PRUFUNGSNAME$/]),
                         initiatedBy: findCol(row, [/^INITIE PAR$/, /^INITIATED BY$/, /^CREATED BY$/, /^INITIIERT VON$/, /^GESTARTET VON$/, /^ERSTELLT VON$/]),
-                        dueBy: findCol(row, [/^PROCHAINE ETAPE DUE PAR$/, /^NEXT STEP DUE BY$/, /^DUE BY$/, /^NACHSTER SCHRITT FALLIG DURCH$/, /^NAECHSTER SCHRITT FAELLIG DURCH$/, /^FALLIG DURCH$/, /^FAELLIG DURCH$/]),
+                        dueBy: findCol(row, [/^PROCHAINE ACTION PAR$/, /^PROCHAINE ACTION DUE PAR$/, /^PROCHAINE ETAPE DUE PAR$/, /^NEXT ACTION BY$/, /^NEXT ACTION DUE BY$/, /^NEXT STEP DUE BY$/, /^DUE BY$/, /^NACHSTER SCHRITT FALLIG DURCH$/, /^NAECHSTER SCHRITT FAELLIG DURCH$/, /^FALLIG DURCH$/, /^FAELLIG DURCH$/]),
                         totalFiles: findCol(row, [/^NOMBRE TOTAL DE FICHIERS$/, /^TOTAL FILES$/, /^GESAMTZAHL DER DATEIEN$/, /^ANZAHL DATEIEN$/]),
                         approvedCount: findCol(row, [/^APPROUVE$/, /^APPROVED$/, /^GENEHMIGT$/, /^FREIGEGEBEN$/]),
                         rejectedCount: findCol(row, [/^REJETE$/, /^REJECTED$/, /^ABGELEHNT$/, /^ZURUCKGEWIESEN$/, /^ZURUECKGEWIESEN$/]),
@@ -5207,7 +5053,7 @@
                 wfData = finalizeWorkflowRoleInfo(wfData);
 
                 const workflowStr = wfData.id || wfOriginal;
-                const commentsStr = wfData.comments || commOriginal;
+                let commentsStr = wfData.comments || commOriginal;
                 
                 const workflowUrl = wfData.wfUrl || wfOriginalUrl;
                 const fileUrl = wfData.fileUrl || directFileUrl || pathUrl;
@@ -5397,6 +5243,11 @@
                 const wfIsCaducInvalidForRow = isWorkflowInvalidStatus(wfGlobalStatusForRow || wfData.globStat || '');
                 const v57Hist = (typeof v57FindHistoryForDocument === 'function') ? v57FindHistoryForDocument({ wfData, fileUrl, workflowUrl, directFileUrl, pathUrl, nomComplet, exactName, version: upVersion }) : {};
                 if (v57Hist && v57Hist.currentRound && !wfData.currentRound) wfData.currentRound = v57Hist.currentRound;
+                // V246 — Autodesk laisse la colonne Comments du rapport vide quand un WF est retourné à l'initiateur.
+                // Dans ce cas seulement, on affiche les commentaires du dernier round terminé issus du Data Connector.
+                if ((!commentsStr || !String(commentsStr).trim()) && v57Hist && v57Hist.returnedToInitiator && v57Hist.lastCompletedComments) {
+                    commentsStr = v57Hist.lastCompletedComments;
+                }
                 if (v57Hist && v57Hist.roundStartedAt && !wfData.roundStartedAt) wfData.roundStartedAt = v57Hist.roundStartedAt;
                 if (v57Hist && v57Hist.roundStartSource && !wfData.roundStartSource) wfData.roundStartSource = v57Hist.roundStartSource;
                 const v58HistResolved = (typeof v58ResolveHistoryAuthorsForRow === 'function')
@@ -7795,6 +7646,7 @@
                 const linkFile = v4FirstNonEmpty(row.extractedFileUrl, wf.fileUrl, explicitFileUrl, nameFileUrl, locationUrl);
                 const workflowIdRaw = v4FirstNonEmpty(wf.id, row.extractedWorkflow, v4FindRaw(row, ['numéro de workflow', 'workflow number', 'workflow id']));
                 const workflowId = normalizeWorkflowId(workflowIdRaw) || workflowIdRaw;
+                const wfReportRecord = (window.__wfReportStatusById instanceof Map && workflowId) ? (window.__wfReportStatusById.get(String(workflowId)) || window.__wfReportStatusById.get(workflowId)) : null;
                 const workflowLink = v4FirstNonEmpty(row.extractedWorkflowUrl, wf.wfUrl, v4FindRawUrl(row, ['id', 'numéro de workflow', 'workflow number', 'workflow id', 'workflow']));
                 // V81 — mapping direct depuis le rapport WF ACC :
                 // Statut Global (WFs) = colonne "Statut" ;
@@ -7809,9 +7661,9 @@
                 const revisionStatus = v4FirstNonEmpty(wf.revStat, row.extractedRevisionStatus);
                 const comments = addDashBeforeCommentatorNames(v4FirstNonEmpty(row.extractedComments, wf.comments, v4FindRaw(row, ['commentaires', 'commentaire', 'comments', 'comment'])));
                 const indice = v4FirstNonEmpty(attr.ind, row.extractedInd, v4FindRaw(row, ['indice', 'ind', 'revision', 'révision']));
-                const dateCreation = v4FirstNonEmpty(wf.dateC, v4FindRaw(row, ['date création', 'date de création', 'date creation', 'date de creation', 'created at', 'created on', 'created', 'créé le', 'cree le', 'creation date']));
-                const dateDue = v4FirstNonEmpty(wf.dateE, v4FindRaw(row, ['échéance', 'echeance', 'due le', 'due date', 'deadline', 'date limite']));
-                const dateClose = v4FirstNonEmpty(wf.dateCl, v4FindRaw(row, ['date clôture', 'date de clôture', 'date cloture', 'date de cloture', 'closed date', 'closed at', 'closed', 'completed', 'clôturé le', 'cloture le', 'date fermeture', 'date de fermeture']));
+                const dateCreation = v4FirstNonEmpty(wf.dateC, wfReportRecord && wfReportRecord.dateC, row.extractedWfCreatedDate, row.extractedCreatedDate, v4FindRaw(row, ['date création', 'date de création', 'date creation', 'date de creation', 'created at', 'created on', 'created', 'créé le', 'cree le', 'creation date']));
+                const dateDue = v4FirstNonEmpty(wf.dateE, wfReportRecord && wfReportRecord.dateE, row.extractedWfDueDate, row.extractedDueDate, v4FindRaw(row, ['échéance', 'echeance', 'due le', 'due date', 'deadline', 'date limite', 'next action due']));
+                const dateClose = v4FirstNonEmpty(wf.dateCl, wfReportRecord && wfReportRecord.dateCl, row.extractedWfClosedDate, row.extractedClosedDate, v4FindRaw(row, ['date clôture', 'date de clôture', 'date cloture', 'date de cloture', 'closed date', 'closed at', 'closed', 'completed', 'finished on', 'clôturé le', 'cloture le', 'date fermeture', 'date de fermeture']));
 
                 return {
                     values: [
@@ -17535,10 +17387,6 @@
         row.extractedWfName = wf.wfName || '';
         row.extractedWfGlobalStatus = displayWorkflowStatus(wf);
         row.extractedRevisionStatus = wf.revStat || '';
-        // V239 : ces cellules suivent le même objet WF vérifié par nom de fichier.
-        row.extractedComments = wf.comments || '';
-        row.extractedWfRoundsHistory = wf.historyRounds || '';
-        row.extractedWfProgressNotes = wf.progressNotes || '';
         try { row.extractedRolesReq = (typeof formatRoleListForOutput === 'function') ? formatRoleListForOutput(wf.rolesReqCalculated || '') : (wf.rolesReqCalculated || wf.rolesReq || ''); } catch(e) { row.extractedRolesReq = wf.rolesReqCalculated || wf.rolesReq || ''; }
         row.extractedRolesReqDetails = wf.rolesReqDetails || '';
         try { row.extractedRolesBlk = (typeof formatRoleListForOutput === 'function') ? formatRoleListForOutput(wf.rolesBlkCalculated || '') : (wf.rolesBlkCalculated || wf.rolesBlk || ''); } catch(e) { row.extractedRolesBlk = wf.rolesBlkCalculated || wf.rolesBlk || ''; }
@@ -29521,273 +29369,259 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
 })();
 </script>
 
-
-<script id="v238-round-separated-comments-notes">
+<script id="v244-adcrm-history-rules-lock">
 /* ==========================================================
-   V239 — Séparation stricte des commentaires par round
-   - Commentaires : contenu du dernier round uniquement ;
-   - Rounds WF : historique complet classé ROUND 1, ROUND 2, ... ;
-   - Notes WF : notes de progression classées par round, sans mélange ;
-   - un ROUND 1 unique reprend exactement le contenu de Commentaires ;
-   - recalcul des rôles bloquants après la séparation.
+   V244 — Historique WF : règles ADCRM restaurées pour DEPB5
+   Source de vérité :
+   - Commentaires / rounds documentaires = reviews_review_comments + reviews_review_documents
+   - Notes de progression = reviews_workflow_notes + reviews_reviews
+   - Le rapport WF "Vérifier le rapport" confirme le WF mais n'écrase jamais
+     les champs d'historique calculés depuis Data Connector.
    ========================================================== */
 (function(){
   'use strict';
-  if(window.__v238RoundSeparationInstalled)return;
-  window.__v238RoundSeparationInstalled=true;
+  window.__v244AdcrmHistoryRules = true;
 
-  function clean(value){return String(value==null?'':value).replace(/\r\n?/g,'\n').trim();}
-  function first(){for(let i=0;i<arguments.length;i++){const value=arguments[i];if(value!==undefined&&value!==null&&clean(value))return clean(value);}return '';}
-  function roundNumber(value){const match=String(value||'').match(/\d+/);return match?Number(match[0]):0;}
-  function trimLines(lines){
-    const out=(lines||[]).map(line=>String(line==null?'':line));
-    while(out.length&&!out[0].trim())out.shift();
-    while(out.length&&!out[out.length-1].trim())out.pop();
-    return out;
-  }
-  function splitByRound(value, fallbackRound){
-    const text=clean(value),groups=new Map();
-    if(!text)return groups;
-    let current=0;
-    text.split('\n').forEach(line=>{
-      const match=String(line||'').match(/^\s*(?:ROUND|TOUR|CYCLE)\s*#?\s*(\d+)\s*:?\s*(.*)$/i);
-      if(match){
-        current=Number(match[1])||0;
-        if(current&&!groups.has(current))groups.set(current,[]);
-        if(current&&clean(match[2]))groups.get(current).push(match[2]);
-        return;
-      }
-      if(!current){
-        current=roundNumber(fallbackRound)||1;
-        if(!groups.has(current))groups.set(current,[]);
-      }
-      groups.get(current).push(line);
-    });
-    Array.from(groups.entries()).forEach(([round,lines])=>{
-      const fixed=trimLines(lines);
-      if(fixed.length)groups.set(round,fixed);else groups.delete(round);
-    });
-    return groups;
-  }
-  function roundContent(lines){return trimLines(lines).join('\n').trim();}
-  function formatGroups(groups){
-    return Array.from((groups||new Map()).entries())
-      .filter(([round,lines])=>Number(round)>0&&roundContent(lines))
-      .sort((a,b)=>Number(a[0])-Number(b[0]))
-      .map(([round,lines])=>'ROUND '+Number(round)+'\n'+roundContent(lines))
-      .join('\n\n');
-  }
-  function knownRows(){
-    const out=[],seenRows=new Set(),seenArrays=new Set();
-    const add=rows=>{if(!Array.isArray(rows)||seenArrays.has(rows))return;seenArrays.add(rows);rows.forEach(row=>{if(row&&typeof row==='object'&&!seenRows.has(row)){seenRows.add(row);out.push(row);}});};
-    try{add(typeof processedData!=='undefined'?processedData:null);}catch(e){}
-    try{add(typeof filteredData!=='undefined'?filteredData:null);}catch(e){}
-    add(window.processedData);add(window.filteredData);
-    try{if(typeof projectsData!=='undefined'&&projectsData)Object.values(projectsData).forEach(project=>{add(project&&project.processedData);add(project&&project.filteredData);});}catch(e){}
-    return out;
-  }
-  function rawHistory(row){
-    const finder=window.v57FindHistoryForDocument||(typeof v57FindHistoryForDocument==='function'?v57FindHistoryForDocument:null);
-    if(typeof finder!=='function')return{};
-    try{
-      return finder({
-        wfData:row.wfData||{},
-        fileUrl:row.extractedFileUrl||row.fileUrl||row['Lien Fichier']||'',
-        directFileUrl:row.directFileUrl||'',
-        pathUrl:row.extractedPathUrl||row.pathUrl||'',
-        workflowUrl:row.extractedWorkflowUrl||row.workflowUrl||'',
-        nomComplet:row.extractedNom||row['Nom du fichier']||row.name||'',
-        exactName:row.exactName||row.extractedNom||'',
-        version:row.extractedVersion||row.version||''
-      })||{};
-    }catch(e){return{};}
-  }
-  function setIfPresent(row,key,value){if(Object.prototype.hasOwnProperty.call(row,key))row[key]=value;}
-  function normalizeRow(row){
-    if(!row||typeof row!=='object')return false;
-    const wf=row.wfData&&typeof row.wfData==='object'?row.wfData:{};
-    const raw=rawHistory(row);
-    const existingCurrent=first(row.extractedComments,row['Commentaires du dernier round'],row.comments,wf.comments);
-    const sourceRounds=first(raw.rounds,row.extractedWfRoundsHistory,row['Historique des commentaires du fichier en fonction de différents rounds'],row.roundsHistory,wf.historyRounds);
-    const sourceNotes=first(raw.notes,row.extractedWfProgressNotes,row['Notes progression WF'],row.workflowNotes,wf.progressNotes);
-    const currentRound=roundNumber(first(raw.currentRound,wf.currentRound,row.extractedCurrentRound));
-
-    let resolved={rounds:sourceRounds,notes:sourceNotes};
-    const resolver=window.v58ResolveHistoryAuthorsForRow||(typeof v58ResolveHistoryAuthorsForRow==='function'?v58ResolveHistoryAuthorsForRow:null);
-    if(typeof resolver==='function'){
-      try{resolved=resolver(sourceRounds,sourceNotes,existingCurrent)||resolved;}catch(e){}
+  function clean(v){ return String(v == null ? '' : v).replace(/\r\n?/g,'\n').trim(); }
+  function keepHistory(row, snapshot){
+    if(!row || !snapshot) return;
+    if(clean(snapshot.comments)) row.extractedComments = snapshot.comments;
+    if(clean(snapshot.rounds)) row.extractedWfRoundsHistory = snapshot.rounds;
+    if(clean(snapshot.notes)) row.extractedWfProgressNotes = snapshot.notes;
+    if(clean(snapshot.rounds)) row.roundsHistory = snapshot.rounds;
+    if(clean(snapshot.notes)) row.workflowNotes = snapshot.notes;
+    if(row.wfData && typeof row.wfData === 'object'){
+      if(clean(snapshot.rounds)) row.wfData.historyRounds = snapshot.rounds;
+      if(clean(snapshot.notes)) row.wfData.progressNotes = snapshot.notes;
     }
-
-    const commentGroups=splitByRound(resolved.rounds||sourceRounds,currentRound||1);
-    const noteGroups=splitByRound(resolved.notes||sourceNotes,currentRound||1);
-    const rounds=formatGroups(commentGroups);
-    const notes=formatGroups(noteGroups);
-    const availableRounds=Array.from(commentGroups.keys()).filter(Number.isFinite).sort((a,b)=>a-b);
-    const latestRound=availableRounds.length?availableRounds[availableRounds.length-1]:0;
-    const latestComments=latestRound?roundContent(commentGroups.get(latestRound)):existingCurrent;
-
-    row.extractedComments=latestComments||'';
-    row.extractedWfRoundsHistory=rounds||'';
-    row.extractedWfProgressNotes=notes||'';
-    row.roundsHistory=rounds||'';
-    row.workflowNotes=notes||'';
-    row.__v238LatestCommentRound=latestRound||currentRound||'';
-    setIfPresent(row,'Commentaires du dernier round',latestComments||'');
-    setIfPresent(row,'comments',latestComments||'');
-    setIfPresent(row,'Historique des commentaires du fichier en fonction de différents rounds',rounds||'');
-    setIfPresent(row,'Notes progression WF',notes||'');
-    row.wfData=Object.assign({},wf,{comments:latestComments||'',historyRounds:rounds||'',progressNotes:notes||''});
-
-    // Les rôles bloquants doivent utiliser seulement le dernier round et les
-    // notes de progression du round actif, jamais un commentaire d'un ancien tour.
-    try{if(typeof v210RefreshRowRoles==='function')v210RefreshRowRoles(row);}catch(e){}
-    return true;
   }
-  function normalizeAll(){
-    let count=0;knownRows().forEach(row=>{if(normalizeRow(row))count++;});
-    window.__v238LastNormalizedRows=count;
-    try{if(typeof window.v210InvalidateFilterCache==='function')window.v210InvalidateFilterCache();}catch(e){}
-    return count;
-  }
-  function schedule(){setTimeout(normalizeAll,220);setTimeout(normalizeAll,950);setTimeout(normalizeAll,2300);}
-
-  window.v238SplitByRound=splitByRound;
-  window.v238FormatRoundGroups=formatGroups;
-  window.v238NormalizeRoundRow=normalizeRow;
-  window.v238NormalizeAllRoundRows=normalizeAll;
-
-  const priorProcess=window.processAllData||(typeof processAllData==='function'?processAllData:null);
-  if(typeof priorProcess==='function'&&!priorProcess.__v238RoundSeparated){
-    const wrapped=function(){const result=priorProcess.apply(this,arguments);if(result&&typeof result.then==='function')result.finally(schedule);else schedule();return result;};
-    wrapped.__v238RoundSeparated=true;wrapped.__v238Original=priorProcess;
-    window.processAllData=wrapped;try{processAllData=wrapped;}catch(e){}
-  }
-  const priorHistoryBuild=window.v57BuildReviewHistoryIndexes||(typeof v57BuildReviewHistoryIndexes==='function'?v57BuildReviewHistoryIndexes:null);
-  if(typeof priorHistoryBuild==='function'&&!priorHistoryBuild.__v238RoundSeparated){
-    const wrapped=function(){const result=priorHistoryBuild.apply(this,arguments);schedule();return result;};
-    wrapped.__v238RoundSeparated=true;wrapped.__v238Original=priorHistoryBuild;
-    window.v57BuildReviewHistoryIndexes=wrapped;try{v57BuildReviewHistoryIndexes=wrapped;}catch(e){}
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule();
-})();
-</script>
-
-<script id="v241-history-final-reattach">
-/* ==========================================================
-   V241 — Rattachement final de l’historique après import
-   - réévalue les lignes déjà affichées lorsque les CSV historiques
-     sont importés après la génération du dashboard ;
-   - privilégie toujours l’URN du fichier + l’identité du WF ;
-   - ne remplace aucune donnée par un historique d’un autre WF ;
-   - rafraîchit le tableau et les filtres sans imposer une nouvelle
-     génération manuelle.
-   ========================================================== */
-(function(){
-  'use strict';
-  if(window.__v241HistoryFinalReattachInstalled)return;
-  window.__v241HistoryFinalReattachInstalled=true;
-
-  function clean(v){return String(v==null?'':v).replace(/\r\n?/g,'\n').trim();}
-  function first(){for(var i=0;i<arguments.length;i++){var v=arguments[i];if(clean(v))return clean(v);}return '';}
-  function identity(){for(var i=0;i<arguments.length;i++){var v=clean(arguments[i]);if(v&&!/^[-–—]+$/.test(v))return v;}return '';}
   function rows(){
-    var out=[],seen=new Set();
-    function add(list){if(!Array.isArray(list))return;list.forEach(function(r){if(r&&typeof r==='object'&&!seen.has(r)){seen.add(r);out.push(r);}});}
-    try{if(typeof processedData!=='undefined')add(processedData);}catch(e){}
-    try{if(Array.isArray(window.processedData))add(window.processedData);}catch(e){}
-    try{if(typeof filteredData!=='undefined')add(filteredData);}catch(e){}
-    try{if(Array.isArray(window.filteredData))add(window.filteredData);}catch(e){}
-    return out;
+    try { if(Array.isArray(processedData)) return processedData; } catch(e) {}
+    return Array.isArray(window.processedData) ? window.processedData : [];
   }
-  function historyFor(row){
-    var finder=window.v57FindHistoryForDocument||(typeof v57FindHistoryForDocument==='function'?v57FindHistoryForDocument:null);
-    if(typeof finder!=='function')return{};
-    var wf=row&&row.wfData&&typeof row.wfData==='object'?row.wfData:{};
-    var id=identity(wf.id,row&&row.extractedWorkflow,row&&row.workflowId,row&&row['ID WF']);
-    var comments=first(wf.comments,row&&row.extractedComments,row&&row.comments,row&&row['Commentaires du dernier round'],row&&row['Commentaires']);
-    var fileUrl=first(row&&row.extractedFileUrl,row&&row.fileUrl,wf.fileUrl,row&&row.directFileUrl,row&&row['Lien Fichier'],row&&row['Lien Data Management']);
-    var pathUrl=first(row&&row.extractedPathUrl,row&&row.pathUrl,wf.pathUrl,row&&row['Chemin ACC'],row&&row['Emplacement du fichier']);
-    var wfUrl=first(row&&row.extractedWorkflowUrl,row&&row.workflowUrl,wf.wfUrl,row&&row['Lien Workflow'],row&&row['Workflow URL']);
-    var name=first(row&&row.extractedNom,row&&row.exactName,row&&row.fileName,row&&row.name,row&&row['Nom du fichier'],row&&row['File Name'],wf._wfSourceFileName);
-    var version=first(row&&row.extractedVersion,row&&row.version,row&&row['Version ACC'],row&&row['Version'],wf._wfSourceVersion);
-    var params={wfData:Object.assign({},wf,{id:id||wf.id||'',comments:comments||wf.comments||''}),fileUrl:fileUrl,directFileUrl:fileUrl,pathUrl:pathUrl,workflowUrl:wfUrl,nomComplet:name,exactName:name,version:version};
-    var h={};
-    try{h=finder(params)||{};}catch(e){h={};}
-    // Certains anciens états ont conservé un objet WF incomplet. Une seconde
-    // tentative avec l’ID/les commentaires de la ligne restaure le lien sans
-    // élargir le périmètre à un autre workflow.
-    if(!clean(h.rounds)&&!clean(h.notes)){
-      try{h=finder(Object.assign({},params,{wfData:{id:id,comments:comments}}))||h||{};}catch(e){}
-    }
-    return h||{};
+  function snapshotRows(){
+    const map = new Map();
+    rows().forEach((r,i)=>map.set(r,{
+      comments: clean(r.extractedComments || (r.wfData&&r.wfData.comments)),
+      rounds: clean(r.extractedWfRoundsHistory || r.roundsHistory || (r.wfData&&r.wfData.historyRounds)),
+      notes: clean(r.extractedWfProgressNotes || r.workflowNotes || (r.wfData&&r.wfData.progressNotes))
+    }));
+    return map;
   }
-  function writeHistory(row,history){
-    if(!row||!history)return false;
-    var rounds=clean(history.rounds),notes=clean(history.notes);
-    if(!rounds&&!notes)return false;
-    var before=first(row.extractedWfRoundsHistory,row.extractedWfProgressNotes,row.roundsHistory,row.workflowNotes,row.wfData&&row.wfData.historyRounds,row.wfData&&row.wfData.progressNotes);
-    if(rounds){row.extractedWfRoundsHistory=rounds;row.roundsHistory=rounds;if(Object.prototype.hasOwnProperty.call(row,'Historique des commentaires du fichier en fonction de différents rounds'))row['Historique des commentaires du fichier en fonction de différents rounds']=rounds;}
-    if(notes){row.extractedWfProgressNotes=notes;row.workflowNotes=notes;if(Object.prototype.hasOwnProperty.call(row,'Notes progression WF'))row['Notes progression WF']=notes;}
-    if(row.wfData&&typeof row.wfData==='object'){if(rounds)row.wfData.historyRounds=rounds;if(notes)row.wfData.progressNotes=notes;}
-    var after=first(row.extractedWfRoundsHistory,row.extractedWfProgressNotes,row.roundsHistory,row.workflowNotes);
-    return after!==before;
-  }
-  function reattach(options){
-    options=options||{};
-    var list=rows(),changed=0,linked=0,historyByRow=[];
-    list.forEach(function(row){
-      var h=historyFor(row);if(!h)return;
-      var rounds=clean(h.rounds),notes=clean(h.notes);
-      if(!rounds&&!notes)return;
-      historyByRow.push({row:row,history:{rounds:rounds,notes:notes}});
-      if(writeHistory(row,{rounds:rounds,notes:notes}))changed++;
-      linked++;
-    });
-    try{if(typeof v210InvalidateFilterCache==='function')v210InvalidateFilterCache();}catch(e){}
-    // V112 sanitizeRows est appelé par applyFilters et réinitialise les deux
-    // champs lorsqu'il remplace l'objet WF. L'application des filtres doit donc
-    // précéder l'écriture finale de l'historique, jamais l'inverse.
-    if(!options.skipFilters){try{if(typeof applyFilters==='function')applyFilters();}catch(e){}}
-    historyByRow.forEach(function(item){if(writeHistory(item.row,item.history))changed++;});
-    try{if(typeof renderTableData==='function')renderTableData();else if(typeof window.renderTableData==='function')window.renderTableData();}catch(e){}
-    window.__v241HistoryFinalStats={rows:list.length,linked:linked,changed:changed,postFilterLinked:historyByRow.filter(function(item){return !!first(item.row.extractedWfRoundsHistory,item.row.extractedWfProgressNotes,item.row.roundsHistory,item.row.workflowNotes);}).length};
-    return window.__v241HistoryFinalStats;
-  }
-  window.v241ReattachHistory=reattach;
+  function restore(map){ if(!map) return; rows().forEach(r=>keepHistory(r,map.get(r))); }
 
-  var priorHistory=window.extractReviewHistoryFromCsvRows||(typeof extractReviewHistoryFromCsvRows==='function'?extractReviewHistoryFromCsvRows:null);
-  if(typeof priorHistory==='function'&&!priorHistory.__v241FinalWrapped){
-    var wrappedHistory=function(){var out=priorHistory.apply(this,arguments);setTimeout(reattach,120);setTimeout(reattach,900);setTimeout(reattach,2200);return out;};
-    wrappedHistory.__v241FinalWrapped=true;wrappedHistory.__v241Original=priorHistory;
-    window.extractReviewHistoryFromCsvRows=wrappedHistory;try{extractReviewHistoryFromCsvRows=wrappedHistory;}catch(e){}
+  // V112 est conservé pour la sécurité WF, mais ne doit jamais effacer les données Data Connector.
+  const oldSanitize = window.v112SanitizeWorkflowRows;
+  if(typeof oldSanitize === 'function' && !oldSanitize.__v244Wrapped){
+    const wrapped=function(){ const snap=snapshotRows(); const out=oldSanitize.apply(this,arguments); restore(snap); return out; };
+    wrapped.__v244Wrapped=true; wrapped.__v244Original=oldSanitize;
+    window.v112SanitizeWorkflowRows=wrapped;
   }
-  var priorProcess=window.processAllData||(typeof processAllData==='function'?processAllData:null);
-  if(typeof priorProcess==='function'&&!priorProcess.__v241FinalWrapped){
-    var wrappedProcess=function(){var out=priorProcess.apply(this,arguments);var schedule=function(){setTimeout(reattach,120);setTimeout(reattach,900);setTimeout(reattach,2400);};if(out&&typeof out.then==='function')out.finally(schedule);else schedule();return out;};
-    wrappedProcess.__v241FinalWrapped=true;wrappedProcess.__v241Original=priorProcess;
-    window.processAllData=wrappedProcess;try{processAllData=wrappedProcess;}catch(e){}
-  }
-  // Toute action de filtre appelle plusieurs couches historiques, dont V112
-  // peut recréer l'objet WF et remettre l'historique à vide. Réparer juste
-  // après le filtrage garantit que la table reste renseignée après un clic.
-  var priorApply=window.applyFilters||(typeof applyFilters==='function'?applyFilters:null);
-  if(typeof priorApply==='function'&&!priorApply.__v241HistoryFinalWrapped){
-    var wrappedApply=function(){
-      var out=priorApply.apply(this,arguments);
-      if(!window.__v241InsideApply){
-        window.__v241InsideApply=true;
-        try{reattach({skipFilters:true});}catch(e){}
-        window.__v241InsideApply=false;
-      }
+
+  // Recalcul natif ADCRM après import des quatre CSV.
+  const oldHistoryImport = window.extractReviewHistoryFromCsvRows || (typeof extractReviewHistoryFromCsvRows==='function' ? extractReviewHistoryFromCsvRows : null);
+  if(typeof oldHistoryImport === 'function' && !oldHistoryImport.__v244Wrapped){
+    const wrapped=function(){
+      const out=oldHistoryImport.apply(this,arguments);
+      try { if(typeof v57BuildReviewHistoryIndexes==='function') v57BuildReviewHistoryIndexes(); } catch(e) {}
       return out;
     };
-    wrappedApply.__v241HistoryFinalWrapped=true;wrappedApply.__v241Original=priorApply;
-    window.applyFilters=wrappedApply;try{applyFilters=wrappedApply;}catch(e){}
+    wrapped.__v244Wrapped=true; wrapped.__v244Original=oldHistoryImport;
+    window.extractReviewHistoryFromCsvRows=wrapped;
+    try { extractReviewHistoryFromCsvRows=wrapped; } catch(e) {}
   }
-  try{document.addEventListener('DOMContentLoaded',function(){setTimeout(reattach,500);setTimeout(reattach,1800);},{once:true});}catch(e){}
-  console.info('[V241] Rattachement final de l’historique et rafraîchissement du tableau activés.');
+
+  // Statistiques visibles dans la console pour contrôle, sans changer les règles métier.
+  window.v244HistoryAudit=function(){
+    const list=rows();
+    const stats={rows:list.length,comments:0,rounds:0,notes:0};
+    list.forEach(r=>{
+      if(clean(r.extractedComments)) stats.comments++;
+      if(clean(r.extractedWfRoundsHistory)) stats.rounds++;
+      if(clean(r.extractedWfProgressNotes)) stats.notes++;
+    });
+    console.info('[V244 ADCRM history rules]',stats,window.__reviewHistoryStats||{});
+    return stats;
+  };
+
+  try { document.title=document.title.replace(/V\d+/i,'V244'); } catch(e) {}
+  console.info('[V244] Règles ADCRM restaurées pour Commentaires / Rounds WF / Notes progression.');
 })();
 </script>
 
+<script id="v245-ui-history-import-fix">
+/* V245 — UI + import CSV historique
+   - libellé visible : Commentaires
+   - suppression du faux toast rouge lorsque les CSV sont effectivement reconnus. */
+(function(){
+  try { document.title=document.title.replace(/V\d+/i,'V245'); } catch(e) {}
+  console.info('[V245] Libellé Commentaires simplifié et diagnostic CSV historique corrigé.');
+})();
+</script>
+
+
+<script id="v246-returned-initiator-marker">
+window.__DEPB5_V246_RETURNED_INITIATOR_RULES__ = true;
+</script>
+
+<script id="v248-export-due-dates-source-fix">
+/* ==========================================================
+   V248 — Dates WF cohérentes dans TOUS les exports Excel
+   Correctif ciblé : le moteur final V207 s'appuie sur v4TemplateRow,
+   tandis que le template frais V187 ne reprenait pas wfData.dateE/dateC/dateCl.
+   Conséquence : l'onglet WF échus pouvait contenir des lignes échues mais
+   une colonne Échéance vide, empêchant aussi la coloration rouge.
+
+   Règle unique V248 :
+   - création  <- row.wfData.dateC (prioritaire)
+   - échéance  <- row.wfData.dateE (prioritaire)
+   - clôture   <- row.wfData.dateCl (prioritaire)
+   - mêmes valeurs dans EXE/BPE, CHANTIER, Arborescence, filtré, WF échus.
+   ========================================================== */
+(function(){
+  if(window.__v248ExportDueDatesInstalled)return;
+  window.__v248ExportDueDatesInstalled=true;
+
+  function clean(v){return String(v==null?'':v).trim();}
+  function usable(v){const s=clean(v);return !!s && !/^[-–—]+$/.test(s);}
+  function first(){for(const v of arguments){if(usable(v))return v;}return '';}
+  function normKey(v){return clean(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+  function rawFind(row,names){
+    row=row||{};const keys=Object.keys(row||{});
+    for(const name of names){const n=normKey(name);for(const k of keys){if(normKey(k)===n&&usable(row[k]))return row[k];}}
+    return '';
+  }
+  function authoritativeDates(row){
+    row=row||{};const wf=row.wfData||{};
+    return {
+      created:first(wf.dateC,row.extractedWfCreationDate,row.extractedWorkflowCreationDate,row.extractedCreationDate,row.dateCreation,row.createdAt,rawFind(row,['Date de création (WFs)','Date de création','Date creation','Created At','Created On'])),
+      due:first(wf.dateE,row.extractedWfDueDate,row.extractedDueDate,row.dateDue,row.dueDate,rawFind(row,['Échéance (Due le)','Échéance','Echeance','Due le','Due Date','Deadline'])),
+      closed:first(wf.dateCl,row.extractedWfClosedDate,row.extractedClosedDate,row.extractedWfCloseDate,row.dateClose,row.closedAt,rawFind(row,['Date Clôture','Date de clôture','Date cloture','Closed At','Closed Date']))
+    };
+  }
+  function applyDates(result,row){
+    if(!result||!Array.isArray(result.values))return result;
+    while(result.values.length<22)result.values.push('');
+    const d=authoritativeDates(row);
+    if(usable(d.created))result.values[19]=d.created;
+    if(usable(d.due))result.values[20]=d.due;
+    if(usable(d.closed))result.values[21]=d.closed;
+    // Synchronise aussi les champs ligne utilisés par d'autres exports/contrôles.
+    if(row&&typeof row==='object'){
+      if(usable(d.created))row.extractedWfCreationDate=d.created;
+      if(usable(d.due)){
+        row.extractedWfDueDate=d.due;
+        row.extractedDueDate=d.due;
+      }
+      if(usable(d.closed)){
+        row.extractedWfClosedDate=d.closed;
+        row.extractedClosedDate=d.closed;
+      }
+    }
+    return result;
+  }
+
+  const previous=window.v4TemplateRow||((typeof v4TemplateRow==='function')?v4TemplateRow:null);
+  if(typeof previous==='function'&&!previous.__v248DueDates){
+    const wrapped=function(row){
+      const result=previous.apply(this,arguments);
+      return applyDates(result,row);
+    };
+    Object.keys(previous).forEach(function(k){try{wrapped[k]=previous[k];}catch(e){}});
+    wrapped.__v248DueDates=true;
+    wrapped.__v248Original=previous;
+    window.v4TemplateRow=wrapped;
+    try{v4TemplateRow=wrapped;}catch(e){}
+  }
+
+  // Rend la même source accessible aux éventuels contrôles/exporteurs secondaires.
+  window.v248WorkflowDatesForExport=authoritativeDates;
+
+  // Vide les caches de templates lorsqu'une nouvelle analyse/import modifie les WF.
+  function refreshRows(){
+    let rows=[];
+    try{if(typeof processedData!=='undefined'&&Array.isArray(processedData))rows=processedData;}catch(e){}
+    try{if(!rows.length&&Array.isArray(window.processedData))rows=window.processedData;}catch(e){}
+    rows.forEach(function(row){
+      const d=authoritativeDates(row);
+      if(usable(d.created))row.extractedWfCreationDate=d.created;
+      if(usable(d.due)){row.extractedWfDueDate=d.due;row.extractedDueDate=d.due;}
+      if(usable(d.closed)){row.extractedWfClosedDate=d.closed;row.extractedClosedDate=d.closed;}
+    });
+  }
+  window.v248RefreshWorkflowDatesForExports=refreshRows;
+
+  const oldProcess=window.processAllData||((typeof processAllData==='function')?processAllData:null);
+  if(typeof oldProcess==='function'&&!oldProcess.__v248DueDates){
+    const wrappedProcess=async function(){
+      const out=await oldProcess.apply(this,arguments);
+      try{refreshRows();}catch(e){}
+      return out;
+    };
+    wrappedProcess.__v248DueDates=true;wrappedProcess.__v248Original=oldProcess;
+    window.processAllData=wrappedProcess;try{processAllData=wrappedProcess;}catch(e){}
+  }
+
+  try{refreshRows();}catch(e){}
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{refreshRows();}catch(e){}},250);});
+  console.info('[V248] Dates création/échéance/clôture des WF réinjectées dans tous les exports Excel ; coloration rouge V207 réactivée.');
+})();
+</script>
+
+<script id="v249-wf-date-source-fix">
+/* V249 — Source fiable des dates WF depuis le rapport "Vérifier le rapport".
+   - L'export Autodesk utilise les en-têtes "Next action due", "Created on", "Finished on".
+   - On conserve ces dates par ID WF et on les réinjecte sur les lignes analysées.
+   - Tous les exports Excel utilisent ensuite les mêmes dates. */
+(function(){
+  if(window.__v249WfDateSourceFixInstalled) return;
+  window.__v249WfDateSourceFixInstalled = true;
+  function clean(v){ return String(v==null?'':v).trim(); }
+  function wfId(v){
+    try { if(typeof normalizeWorkflowId==='function') return clean(normalizeWorkflowId(v||'')); } catch(e){}
+    var m=clean(v).match(/#?\s*(\d{1,8})\b/); return m?m[1]:clean(v);
+  }
+  function rows(){
+    var out=[],seen=new Set();
+    function add(a){ if(!Array.isArray(a)) return; a.forEach(function(r){ if(r&&typeof r==='object'&&!seen.has(r)){seen.add(r);out.push(r);} }); }
+    try{ if(typeof processedData!=='undefined') add(processedData); }catch(e){}
+    try{ if(typeof filteredData!=='undefined') add(filteredData); }catch(e){}
+    try{ add(window.processedData); add(window.filteredData); }catch(e){}
+    try{ if(typeof projectsData!=='undefined'&&projectsData) Object.values(projectsData).forEach(function(p){add(p&&p.processedData);add(p&&p.filteredData);}); }catch(e){}
+    return out;
+  }
+  function backfill(){
+    var map=window.__wfReportStatusById;
+    if(!(map instanceof Map)||!map.size) return {rows:0,dates:0};
+    var n=0,d=0;
+    rows().forEach(function(row){
+      var wf=row.wfData||{};
+      var id=wfId(wf.id||row.extractedWorkflow||row.workflow||row['ID']||'');
+      if(!id) return;
+      var rec=map.get(id)||map.get(String(id));
+      if(!rec) return;
+      n++;
+      row.wfData=wf;
+      if(clean(rec.dateC)){ wf.dateC=clean(rec.dateC); row.extractedWfCreatedDate=clean(rec.dateC); }
+      if(clean(rec.dateE)&&clean(rec.dateE)!=='--'){ wf.dateE=clean(rec.dateE); row.extractedWfDueDate=clean(rec.dateE); row.extractedDueDate=clean(rec.dateE); d++; }
+      if(clean(rec.dateCl)&&clean(rec.dateCl)!=='--'){ wf.dateCl=clean(rec.dateCl); row.extractedWfClosedDate=clean(rec.dateCl); row.extractedClosedDate=clean(rec.dateCl); }
+    });
+    window.__v249WfDateStats={rows:n,dueDates:d,reportIds:map.size};
+    return window.__v249WfDateStats;
+  }
+  window.v249BackfillWorkflowDates=backfill;
+  var priorAnalyze=window.analyzeData||(typeof analyzeData==='function'?analyzeData:null);
+  if(typeof priorAnalyze==='function'&&!priorAnalyze.__v249DatesWrapped){
+    var wa=function(){var x=priorAnalyze.apply(this,arguments);try{backfill();}catch(e){};return x;};
+    wa.__v249DatesWrapped=true; wa.__v249Original=priorAnalyze; window.analyzeData=wa; try{analyzeData=wa;}catch(e){}
+  }
+  var priorProcess=window.processAllData||(typeof processAllData==='function'?processAllData:null);
+  if(typeof priorProcess==='function'&&!priorProcess.__v249DatesWrapped){
+    var wp=function(){var x=priorProcess.apply(this,arguments);try{backfill();}catch(e){};return x;};
+    wp.__v249DatesWrapped=true; wp.__v249Original=priorProcess; window.processAllData=wp; try{processAllData=wp;}catch(e){}
+  }
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(backfill,800);setTimeout(backfill,2200);});
+})();
+</script>
 </body>
 </html>
