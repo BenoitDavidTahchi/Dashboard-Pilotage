@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CFLImmo - Dashboard Documentaire DEPB5 - V246</title>
+    <title>CFLImmo - Dashboard Documentaire DEPB5 - V253</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com">
 
@@ -2320,7 +2320,7 @@
             // V81 : un statut de fichier comme "Rejeté avec des commentaires" n'invalide pas le WF.
             // On considère un WF caduc/invalidé uniquement si le statut WF porte explicitement
             // INVALIDÉ / INVALID / CADUC / CDUC.
-            return /(INVALIDE|INVALID|INVALIDATED|INVALIDIERT|UNGULTIG|UNGUELTIG|CADUC|CDUC|HINFALLIG|HINFAELLIG|ANNULLIERT|STORNIERT)/.test(txt);
+            return /(INVALIDE|INVALID|INVALIDATED|VOID|VOIDED|INVALIDIERT|UNGULTIG|UNGUELTIG|CADUC|CDUC|HINFALLIG|HINFAELLIG|ANNULLIERT|STORNIERT)/.test(txt);
         }
 
         function isWorkflowClosedStatus(value) {
@@ -2343,7 +2343,7 @@
             const txt = normalizeForRoleSearch(value);
             // "Rejeté avec commentaires" est un statut de fichier, pas une revue ACC invalidée.
             // CADUC est réservé aux WF vraiment INVALIDÉ/CADUC.
-            return /(INVALIDE|INVALID|INVALIDATED|INVALIDIERT|UNGULTIG|UNGUELTIG|CADUC|CDUC|HINFALLIG|HINFAELLIG|ANNULLIERT|STORNIERT)/.test(txt);
+            return /(INVALIDE|INVALID|INVALIDATED|VOID|VOIDED|INVALIDIERT|UNGULTIG|UNGUELTIG|CADUC|CDUC|HINFALLIG|HINFAELLIG|ANNULLIERT|STORNIERT)/.test(txt);
         }
 
         function computeStatutAcc(defaultStatus, globalStatus, revisionStatus, currentStep) {
@@ -25228,7 +25228,7 @@ self.onmessage=async function(ev){
                 try {
                     const __g = String(__row && (__row.extractedWfGlobalStatus || __row['Statut Global (WFs)'] || '') || '')
                         .normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
-                    if (/(^|\b)(INVALIDE|INVALID|INVALIDATED|CADUC|ANNULE|ANNULEE)(\b|$)/.test(__g)) {
+                    if (/(^|\b)(INVALIDE|INVALID|INVALIDATED|VOID|VOIDED|CADUC|ANNULE|ANNULEE)(\b|$)/.test(__g)) {
                         __row.extractedStatus = 'CADUC';
                         __row['Statut ACC'] = 'CADUC';
                         __row.extractedCurrentStep = '';
@@ -26267,7 +26267,7 @@ self.onmessage=async function(ev){
       .replace(/[’']/g,' ').replace(/\s+/g,' ').trim().toUpperCase();
   }
   function isInvalidGlobal(v){
-    return /(^|\b)(INVALIDE|INVALID|INVALIDATED|CADUC|ANNULE|ANNULEE)(\b|$)/.test(norm(v));
+    return /(^|\b)(INVALIDE|INVALID|INVALIDATED|VOID|VOIDED|CADUC|ANNULE|ANNULEE)(\b|$)/.test(norm(v));
   }
   function enforceTemplate(tpl){
     if (!tpl || !Array.isArray(tpl.values)) return tpl;
@@ -26332,7 +26332,7 @@ self.onmessage=async function(ev){
       .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
       .replace(/[’']/g,' ').replace(/\s+/g,' ').trim().toUpperCase();
   }
-  function isInvalid(v){ return /(^|\b)(INVALIDE|INVALID|INVALIDATED|CADUC|ANNULE|ANNULEE)(\b|$)/.test(norm(v)); }
+  function isInvalid(v){ return /(^|\b)(INVALIDE|INVALID|INVALIDATED|VOID|VOIDED|CADUC|ANNULE|ANNULEE)(\b|$)/.test(norm(v)); }
   function isOpen(v){ return /(^|\b)(OUVERT|OPEN|EN COURS|IN PROGRESS|PENDING|REVUE EN COURS)(\b|$)/.test(norm(v)); }
   function isInitiatorStep(v){ return /(INITIATEUR|INITIATOR|EMETTEUR|SENDER|CREATEUR|CREATOR|RETOUR|RETURNED|A CORRIGER|CORRECTION|ERSTELLER|EINREICHER|ABSENDER)/.test(norm(v)); }
   function currentAcc(globalStatus, step, fallback){
@@ -27090,7 +27090,7 @@ self.onmessage=async function(ev){
       try{const name=typeof window.v185ResolveAuthor==='function'?window.v185ResolveAuthor(code):'';return name||code;}catch(e){return code;}
     });
   }
-  function isInvalid(v){return /(^|\b)(INVALIDE|INVALID|INVALIDATED|CADUC|ANNULE|ANNULEE)(\b|$)/.test(norm(v));}
+  function isInvalid(v){return /(^|\b)(INVALIDE|INVALID|INVALIDATED|VOID|VOIDED|CADUC|ANNULE|ANNULEE)(\b|$)/.test(norm(v));}
   function isOpen(v){return /(^|\b)(OUVERT|OPEN|EN COURS|IN PROGRESS|PENDING|REVUE EN COURS)(\b|$)/.test(norm(v));}
   function initiatorStep(v){return /(INITIATEUR|INITIATOR|EMETTEUR|SENDER|CREATEUR|CREATOR|RETOUR|RETURNED|A CORRIGER|CORRECTION|ERSTELLER|EINREICHER|ABSENDER)/.test(norm(v));}
   function enforce(result){
@@ -29623,5 +29623,493 @@ window.__DEPB5_V246_RETURNED_INITIATOR_RULES__ = true;
   document.addEventListener('DOMContentLoaded',function(){setTimeout(backfill,800);setTimeout(backfill,2200);});
 })();
 </script>
+
+<script id="v250-closed-workflow-blocking-role-guard">
+/* V250 — Rôles bloquants : un WF fermé / clôturé / invalidé ne peut jamais conserver un rôle bloquant.
+   Corrige les valeurs résiduelles OA/ARCH/etc. provenant des fallbacks V114/V117. */
+(function(){
+  'use strict';
+  if(window.__v250ClosedWorkflowBlockingGuard)return;
+  window.__v250ClosedWorkflowBlockingGuard=true;
+  window.__CFL_IMMO_DASHBOARD_VERSION__='V250';
+
+  function clean(v){return String(v==null?'':v).trim();}
+  function norm(v){return clean(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[’']/g,' ').replace(/\s+/g,' ').trim();}
+  function first(){for(var i=0;i<arguments.length;i++){var s=clean(arguments[i]);if(s&&!/^[-–—]+$/.test(s))return s;}return '';}
+
+  function workflowState(row){
+    row=row||{};var wf=row.wfData||{};
+    return first(row.extractedWfGlobalStatus,wf.globStat,row['Statut Global (WFs)'],wf.step,row.extractedCurrentStep);
+  }
+  function hasClosedDate(row){
+    row=row||{};var wf=row.wfData||{};
+    var v=first(wf.dateCl,row.extractedWfClosedDate,row.extractedClosedDate,row['Date Clôture']);
+    return !!v;
+  }
+  function closedOrInvalid(row){
+    var state=workflowState(row);
+    try{if(typeof isWorkflowInvalidStatus==='function'&&isWorkflowInvalidStatus(state))return true;}catch(e){}
+    try{if(typeof isWorkflowClosedStatus==='function'&&isWorkflowClosedStatus(state))return true;}catch(e){}
+    if(hasClosedDate(row))return true;
+    var n=norm(state);
+    return /(FERME|FERMEE|CLOSED|CLOTURE|CLOTUREE|COMPLETED|TERMINE|TERMINEE|DONE|INVALID|INVALIDE|VOID|VOIDED|CADUC|ANNULE|ANNULEE)/.test(n);
+  }
+  function clearBlocking(row){
+    if(!row||!closedOrInvalid(row))return false;
+    var wf=row.wfData||{};
+    wf.rolesBlkList=[];
+    wf.rolesBlkCalculated='';
+    wf.rolesBlk='';
+    wf.rolesBlkDetails='';
+    wf.roleAnalysisStatus='WF fermé/invalidé : aucun rôle bloquant.';
+    row.wfData=wf;
+    row.extractedRolesBlk='';
+    row.extractedRolesBlkDetails='';
+    row.extractedRoleAnalysisStatus=wf.roleAnalysisStatus;
+    if(Object.prototype.hasOwnProperty.call(row,'Rôles Bloquants'))row['Rôles Bloquants']='';
+    return true;
+  }
+  function rows(){
+    var out=[],seen=new Set();
+    function add(a){if(!Array.isArray(a))return;a.forEach(function(r){if(r&&typeof r==='object'&&!seen.has(r)){seen.add(r);out.push(r);}});}
+    try{if(typeof processedData!=='undefined')add(processedData);}catch(e){}
+    try{if(typeof filteredData!=='undefined')add(filteredData);}catch(e){}
+    try{add(window.processedData);add(window.filteredData);}catch(e){}
+    try{if(typeof projectsData!=='undefined'&&projectsData)Object.values(projectsData).forEach(function(p){add(p&&p.processedData);add(p&&p.filteredData);});}catch(e){}
+    return out;
+  }
+  function sanitize(redraw){
+    var list=rows(),cleared=0;
+    list.forEach(function(row){if(clearBlocking(row))cleared++;});
+    window.__v250BlockingGuardStats={rows:list.length,closedRowsCleared:cleared};
+    try{if(typeof window.v210InvalidateFilterCache==='function')window.v210InvalidateFilterCache();}catch(e){}
+    if(redraw){
+      try{if(typeof renderTableData==='function')renderTableData();else if(typeof window.renderTableData==='function')window.renderTableData();}catch(e){}
+    }
+    return window.__v250BlockingGuardStats;
+  }
+  window.v250SanitizeClosedWorkflowBlockingRoles=sanitize;
+  window.v250WorkflowClosedOrInvalid=closedOrInvalid;
+
+  // Filtre intelligent : même si une ancienne valeur OA subsiste quelque part, un WF fermé ne passe jamais le filtre.
+  var oldHas=window.v106HasBlockingRoles;
+  window.v106HasBlockingRoles=function(row,roleValue){
+    if(closedOrInvalid(row))return false;
+    return typeof oldHas==='function'?oldHas(row,roleValue):false;
+  };
+
+  // Filtres issus des graphiques de blocage : même garde métier.
+  var oldGraph=window.v211MatchesBlockingGraph;
+  if(typeof oldGraph==='function'){
+    window.v211MatchesBlockingGraph=function(row,type,value){
+      if(closedOrInvalid(row))return false;
+      return oldGraph.apply(this,arguments);
+    };
+  }
+
+  // Après chaque traitement, purger les rôles résiduels avant affichage/filtrage.
+  var oldProcess=window.processAllData||((typeof processAllData==='function')?processAllData:null);
+  if(typeof oldProcess==='function'&&!oldProcess.__v250BlockingGuard){
+    var wrappedProcess=async function(){
+      var result=await oldProcess.apply(this,arguments);
+      try{sanitize(false);}catch(e){}
+      try{if(typeof window.applyFiltersNow==='function')window.applyFiltersNow();else if(typeof applyFilters==='function')applyFilters();}catch(e){}
+      return result;
+    };
+    wrappedProcess.__v250BlockingGuard=true;wrappedProcess.__v250Original=oldProcess;
+    window.processAllData=wrappedProcess;try{processAllData=wrappedProcess;}catch(e){}
+  }
+
+  // Recalcule après les rafraîchissements rôles V210 puis purge les fermés.
+  var oldRefresh=window.v210RefreshAllRoles;
+  if(typeof oldRefresh==='function'&&!oldRefresh.__v250BlockingGuard){
+    var wrappedRefresh=function(){var result=oldRefresh.apply(this,arguments);try{sanitize(false);}catch(e){}return result;};
+    wrappedRefresh.__v250BlockingGuard=true;wrappedRefresh.__v250Original=oldRefresh;
+    window.v210RefreshAllRoles=wrappedRefresh;try{v210RefreshAllRoles=wrappedRefresh;}catch(e){}
+  }
+
+  function ui(){
+    try{document.title=document.title.replace(/V\d+/i,'V250');}catch(e){}
+    try{document.documentElement.setAttribute('data-dashboard-version','V250');}catch(e){}
+  }
+  ui();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){ui();setTimeout(function(){sanitize(true);},500);},{once:true});
+  else setTimeout(function(){sanitize(true);},250);
+  setTimeout(function(){sanitize(true);},1800);
+  console.info('[V250] Garde rôles bloquants active : WF fermé/clôturé/invalidé = aucun rôle bloquant.');
+})();
+</script>
+
+
+<script id="v251-void-workflow-status-fix">
+/* V251 — Autodesk VOID = workflow invalidé/caduc.
+   Source de vérité: statut global du rapport WF par ID.
+   Empêche un ancien statut fichier (ex. "Rejeté avec des commentaires" d'un autre WF)
+   de remplacer l'état courant d'un WF VOID. */
+(function(){
+  'use strict';
+  if(window.__v251VoidWorkflowStatusFixInstalled) return;
+  window.__v251VoidWorkflowStatusFixInstalled = true;
+  window.__CFL_IMMO_DASHBOARD_VERSION__='V251';
+
+  function clean(v){ return String(v==null?'':v).trim(); }
+  function norm(v){ return clean(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim(); }
+  function idOf(v){
+    try{ if(typeof normalizeWorkflowId==='function') return clean(normalizeWorkflowId(v||'')); }catch(e){}
+    var m=clean(v).match(/#?\s*(\d{1,8})\b/); return m?m[1]:clean(v);
+  }
+  function rowId(row){
+    row=row||{}; var wf=row.wfData||{};
+    return idOf(wf.id||row.extractedWorkflow||row['ID']||row.workflow||'');
+  }
+  function isVoid(v){ return /(^|\b)(VOID|VOIDED)(\b|$)/.test(norm(v)); }
+  function rows(){
+    var out=[],seen=new Set();
+    function add(a){ if(!Array.isArray(a))return; a.forEach(function(r){ if(r&&typeof r==='object'&&!seen.has(r)){seen.add(r);out.push(r);} }); }
+    try{if(typeof processedData!=='undefined')add(processedData);}catch(e){}
+    try{if(typeof filteredData!=='undefined')add(filteredData);}catch(e){}
+    try{add(window.processedData);add(window.filteredData);}catch(e){}
+    try{if(typeof projectsData!=='undefined'&&projectsData)Object.values(projectsData).forEach(function(p){add(p&&p.processedData);add(p&&p.filteredData);});}catch(e){}
+    return out;
+  }
+  function repairRow(row){
+    if(!row) return false;
+    var id=rowId(row);
+    if(!id) return false;
+    var map=window.__wfReportStatusById;
+    var rec=(map instanceof Map)?(map.get(id)||map.get(String(id))):null;
+    var wf=row.wfData||{};
+    var raw=clean(rec&&rec.globStat)||clean(wf.globStat)||clean(row.extractedWfGlobalStatus)||clean(row['Statut Global (WFs)']);
+    if(!isVoid(raw)) return false;
+
+    // Etat courant du WF : VOID est un état invalidé Autodesk.
+    wf.globStat=clean(rec&&rec.globStat)||'VOID';
+    wf.step='';
+    wf.currentStepCalculated='Invalidé';
+    wf.rolesBlkList=[];
+    wf.rolesBlkCalculated='';
+    wf.rolesBlk='';
+    wf.rolesBlkDetails='';
+    wf.rolesNoCommentCalculated='';
+    wf.rolesNoCommentDetails='';
+    wf.roleAnalysisStatus='WF VOID / invalidé : aucun rôle bloquant.';
+    row.wfData=wf;
+
+    row.extractedWfGlobalStatus='INVALIDÉ';
+    row.extractedStatus='CADUC';
+    row.extractedCurrentStep='';
+    row.extractedRolesBlk='';
+    row.extractedRolesBlkDetails='';
+    row.extractedRolesNoComment='';
+    row.extractedRolesNoCommentDetails='';
+    row.extractedRoleAnalysisStatus=wf.roleAnalysisStatus;
+
+    // Dans le rapport DEPB5 fourni, toutes les lignes VOID ont Review status vide.
+    // On ne conserve donc jamais une décision d'un autre WF pour la colonne de révision courante.
+    row.extractedRevisionStatus='';
+    if(Object.prototype.hasOwnProperty.call(row,'Statut Global (WFs)')) row['Statut Global (WFs)']='INVALIDÉ';
+    if(Object.prototype.hasOwnProperty.call(row,'Statut ACC')) row['Statut ACC']='CADUC';
+    if(Object.prototype.hasOwnProperty.call(row,'Étape actuelle')) row['Étape actuelle']='';
+    if(Object.prototype.hasOwnProperty.call(row,'Rôles Bloquants')) row['Rôles Bloquants']='';
+    if(Object.prototype.hasOwnProperty.call(row,'Statut Révision (Fichier)')) row['Statut Révision (Fichier)']='';
+    return true;
+  }
+  function repair(redraw){
+    var list=rows(),fixed=0;
+    list.forEach(function(r){ if(repairRow(r))fixed++; });
+    window.__v251VoidWorkflowStats={rows:list.length,voidRowsFixed:fixed};
+    try{if(typeof window.v210InvalidateFilterCache==='function')window.v210InvalidateFilterCache();}catch(e){}
+    if(redraw){
+      try{if(typeof applyFilters==='function')applyFilters();}catch(e){}
+      try{if(typeof renderTableData==='function')renderTableData();else if(typeof window.renderTableData==='function')window.renderTableData();}catch(e){}
+    }
+    return window.__v251VoidWorkflowStats;
+  }
+  window.v251RepairVoidWorkflowStatuses=repair;
+
+  // Recalcule après analyse/import.
+  var oldProcess=window.processAllData||((typeof processAllData==='function')?processAllData:null);
+  if(typeof oldProcess==='function'&&!oldProcess.__v251VoidFix){
+    var wp=async function(){var result=await oldProcess.apply(this,arguments);try{repair(false);}catch(e){};try{if(typeof applyFilters==='function')applyFilters();}catch(e){};return result;};
+    wp.__v251VoidFix=true;wp.__v251Original=oldProcess;window.processAllData=wp;try{processAllData=wp;}catch(e){}
+  }
+  var oldAnalyze=window.analyzeData||((typeof analyzeData==='function')?analyzeData:null);
+  if(typeof oldAnalyze==='function'&&!oldAnalyze.__v251VoidFix){
+    var wa=function(){var result=oldAnalyze.apply(this,arguments);try{repair(false);}catch(e){};return result;};
+    wa.__v251VoidFix=true;wa.__v251Original=oldAnalyze;window.analyzeData=wa;try{analyzeData=wa;}catch(e){}
+  }
+
+  function ui(){
+    try{document.title=document.title.replace(/V\d+(?:[- ][A-Z0-9_-]+)?/i,'V251');}catch(e){}
+    try{document.documentElement.setAttribute('data-dashboard-version','V251');}catch(e){}
+  }
+  ui();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){ui();setTimeout(function(){repair(true);},650);},{once:true});
+  else setTimeout(function(){repair(true);},300);
+  setTimeout(function(){repair(true);},1900);
+  console.info('[V251] Autodesk VOID traité comme INVALIDÉ/CADUC ; statuts fichier d’autres WF exclus.');
+})();
+</script>
+
+<style id="v252-depb5-neutral-project-banner-style">
+/* V252 : le bandeau photo de la page de garde ne réutilise plus l'ancien visuel hérité ADCRM
+   lorsqu'aucune bannière personnalisée DEPB5 n'a été chargée. */
+html[data-v252-depb5="1"] #project-banner-container.v252-no-custom-banner {
+  background-image: none !important;
+  background: linear-gradient(135deg, rgba(15,23,42,.98), rgba(51,65,85,.96)) !important;
+  height: 12rem !important;
+  min-height: 12rem !important;
+}
+/* L'ancien observateur V81 recrée cette image après chaque import. Elle reste dans
+   le DOM pour ne pas perturber ce code historique, mais ne peut plus être affichée. */
+html[data-v252-depb5="1"] #project-banner-container img.v81-project-banner-img {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+html[data-v252-depb5="1"] #project-banner-container.v252-custom-banner {
+  height: 12rem !important;
+  min-height: 12rem !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+html[data-v252-depb5="1"] #project-banner-container.v252-no-custom-banner #banner-placeholder {
+  display:flex !important;
+  color:#e2e8f0 !important;
+}
+html[data-v252-depb5="1"] #project-banner-container.v252-no-custom-banner #banner-placeholder::after {
+  content:'DEPB5 · Déportation';
+  font-size:1rem;
+  font-weight:800;
+  letter-spacing:.04em;
+  margin-top:.35rem;
+}
+</style>
+<script id="v252-members-rounds-blocking-role-fix">
+(function(){
+  'use strict';
+  if(window.__v252MembersRoundsBlockingRoleFixInstalled)return;
+  window.__v252MembersRoundsBlockingRoleFixInstalled=true;
+  document.documentElement.setAttribute('data-v252-depb5','1');
+
+  const clean=v=>String(v==null?'':v).replace(/\r\n?/g,'\n').trim();
+  function roundNumber(value){
+    const m=clean(value).match(/\d+/); return m?Number(m[0]):null;
+  }
+  function uniqAuthors(list){
+    const out=[], seen=new Set();
+    (list||[]).forEach(a=>{
+      if(!a)return;
+      const roles=Array.isArray(a.roles)?a.roles.slice():[];
+      const key=[clean(a.author).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase(),roles.join('|'),clean(a.evidenceColumn)].join('¦');
+      if(seen.has(key))return; seen.add(key); out.push(a);
+    });
+    return out;
+  }
+
+  /*
+    V252 : les auteurs des Rounds WF deviennent une source métier du calcul des bloqueurs.
+    Si l'historique comporte explicitement le round courant, il est la source de vérité :
+    on ne réutilise pas les commentaires non marqués d'un round précédent.
+  */
+  function evidenceV252(wfObj){
+    wfObj=wfObj||{};
+    const commentsText = (typeof v210RoleCommentText==='function') ? v210RoleCommentText(wfObj) : clean(wfObj.comments);
+    const notesText = (typeof v217RoleProgressNotes==='function') ? v217RoleProgressNotes(wfObj) : clean(wfObj.progressNotes);
+    const historyText = clean(wfObj.historyRounds || wfObj._v252HistoryRounds || '');
+
+    const parse = value => (typeof v210CommentAuthorEvidence==='function') ? v210CommentAuthorEvidence(value) : {round:null,authors:[],unresolved:[],hasUnparsedText:!!clean(value)};
+    const c = parse(commentsText), h = parse(historyText), n = parse(notesText);
+    const declared = roundNumber(wfObj.currentRound || wfObj.currentRoundNum || wfObj.roundNum);
+    const known=[declared,c.round,h.round,n.round].filter(Number.isFinite);
+    const active = declared!==null ? declared : (known.length?Math.max.apply(null,known):null);
+
+    const hasRoundMarkers=/\b(?:ROUND|TOUR|CYCLE)\s*#?\s*\d+\b/i.test(historyText);
+    const hasActiveMarker=active!==null && new RegExp('\\b(?:ROUND|TOUR|CYCLE)\\s*#?\\s*'+active+'\\b','i').test(historyText);
+    const authors=[], unresolved=[];
+
+    // Historique par round : source prioritaire lorsqu'il documente le round actif.
+    if(historyText && (!hasRoundMarkers || active===null || h.round===active)){
+      (h.authors||[]).forEach(a=>authors.push(Object.assign({},a,{evidenceColumn:'round-history',submitted:false})));
+      unresolved.push(...(h.unresolved||[]));
+    }
+
+    // Le rapport WF peut contenir un texte sans marqueur ROUND. On ne l'utilise que
+    // si l'historique ne matérialise pas déjà le round actif.
+    const useComments = !hasActiveMarker && (c.round===null || active===null || c.round===active);
+    if(useComments){
+      (c.authors||[]).forEach(a=>authors.push(Object.assign({},a,{evidenceColumn:'comments',submitted:false})));
+      unresolved.push(...(c.unresolved||[]));
+    }
+
+    const useNotes = n.round===null ? active===null : (active===null || n.round===active);
+    if(useNotes){
+      (n.authors||[]).forEach(a=>authors.push(Object.assign({},a,{evidenceColumn:'progress-notes',submitted:true})));
+      unresolved.push(...(n.unresolved||[]));
+    }
+
+    return {
+      round: active,
+      authors: uniqAuthors(authors),
+      unresolved: Array.from(new Set(unresolved.filter(Boolean))),
+      hasUnparsedText: (!!historyText && h.hasUnparsedText) || (useComments && c.hasUnparsedText) || (useNotes && n.hasUnparsedText),
+      usedProgressNotes: useNotes && (n.authors||[]).length>0,
+      usedRoundHistory: !!historyText
+    };
+  }
+  try{ window.v217WorkflowAuthorEvidence = v217WorkflowAuthorEvidence = evidenceV252; }catch(e){ window.v217WorkflowAuthorEvidence=evidenceV252; }
+
+  function rows(){
+    const out=[],seenArr=new Set(),seenObj=new Set();
+    const add=list=>{ if(!Array.isArray(list)||seenArr.has(list))return; seenArr.add(list); list.forEach(r=>{if(r&&typeof r==='object'&&!seenObj.has(r)){seenObj.add(r);out.push(r);}}); };
+    try{add(typeof processedData!=='undefined'?processedData:null);}catch(e){}
+    try{add(typeof filteredData!=='undefined'?filteredData:null);}catch(e){}
+    add(window.processedData);add(window.filteredData);
+    return out;
+  }
+  function syncOne(row){
+    if(!row||!row.wfData||typeof row.wfData!=='object')return false;
+    /* Un même objet wfData peut être partagé par plusieurs fichiers du même WF.
+       Le cloner est indispensable : les commentaires/réponses d'un fichier ne
+       doivent ni effacer ni attribuer les bloqueurs d'un autre fichier. */
+    const wf=Object.assign({},row.wfData);
+    const own=(key)=>Object.prototype.hasOwnProperty.call(row,key);
+    const rounds=clean(own('extractedWfRoundsHistory') ? row.extractedWfRoundsHistory :
+      (own('roundsHistory') ? row.roundsHistory : wf.historyRounds));
+    const comments=clean(own('extractedComments') ? row.extractedComments :
+      (own('Commentaires') ? row['Commentaires'] :
+      (own('Commentaires du dernier round') ? row['Commentaires du dernier round'] : wf.comments)));
+    const notes=clean(own('extractedWfProgressNotes') ? row.extractedWfProgressNotes :
+      (own('workflowNotes') ? row.workflowNotes :
+      (own('Notes progression WF') ? row['Notes progression WF'] : wf.progressNotes)));
+    wf.historyRounds=rounds;
+    wf._v252HistoryRounds=rounds;
+    wf._v210RoleComments=comments;
+    wf._v217RoleProgressNotes=notes;
+    try{delete wf.__finalizedCacheKey;}catch(e){wf.__finalizedCacheKey='';}
+    try{
+      if(typeof finalizeWorkflowRoleInfo==='function') finalizeWorkflowRoleInfo(wf);
+      else if(typeof window.finalizeWorkflowRoleInfo==='function') window.finalizeWorkflowRoleInfo(wf);
+    }catch(e){return false;}
+    row.wfData=wf;
+    try{ row.extractedRolesReq=typeof formatRoleListForOutput==='function'?formatRoleListForOutput(wf.rolesReqCalculated||''):(wf.rolesReqCalculated||''); }catch(e){row.extractedRolesReq=wf.rolesReqCalculated||'';}
+    try{ row.extractedRolesBlk=typeof formatRoleListForOutput==='function'?formatRoleListForOutput(wf.rolesBlkCalculated||''):(wf.rolesBlkCalculated||''); }catch(e){row.extractedRolesBlk=wf.rolesBlkCalculated||'';}
+    row.extractedRolesBlkDetails=wf.rolesBlkDetails||'';
+    row.extractedRoleAnalysisStatus=wf.roleAnalysisStatus||'';
+    if(Object.prototype.hasOwnProperty.call(row,'Rôles Bloquants'))row['Rôles Bloquants']=row.extractedRolesBlk;
+    if(Object.prototype.hasOwnProperty.call(row,'Rôles Obligatoires'))row['Rôles Obligatoires']=row.extractedRolesReq;
+    return true;
+  }
+  function refreshRoles(redraw){
+    // Le dictionnaire Autodesk ID -> nom est reconstruit avant le calcul : cela permet
+    // notamment de rapprocher un auteur CSV de la personne du fichier Membres.
+    try{if(typeof window.v185RebuildAuthorMappings==='function')window.v185RebuildAuthorMappings();}catch(e){}
+    let changed=0; rows().forEach(r=>{if(syncOne(r))changed++;});
+    try{window.__wfNeedsRoleRecalc=false;}catch(e){}
+    try{if(typeof window.v210InvalidateFilterCache==='function')window.v210InvalidateFilterCache();}catch(e){}
+    if(redraw!==false){
+      try{if(typeof applyFilters==='function')applyFilters();}catch(e){}
+      try{if(typeof renderTableData==='function')renderTableData();}catch(e){}
+      try{if(typeof window.v211RenderBlockingAnalysis==='function')window.v211RenderBlockingAnalysis();}catch(e){}
+    }
+    window.__v252RoleRefreshCount=changed;
+    return changed;
+  }
+  window.v252RefreshBlockingRoles=refreshRoles;
+
+  function scheduleRoles(){ [100,500,1300,2600].forEach(ms=>setTimeout(()=>{try{refreshRoles(true);}catch(e){}},ms)); }
+
+  // Après import du fichier Membres : recalcul immédiat des bloqueurs avec les rôles importés.
+  try{
+    const oldCommit=window.v212CommitMembersImport || (typeof v212CommitMembersImport==='function'?v212CommitMembersImport:null);
+    if(typeof oldCommit==='function'&&!oldCommit.__v252Wrapped){
+      const wrapped=function(){const out=oldCommit.apply(this,arguments);scheduleRoles();return out;};
+      wrapped.__v252Wrapped=true;wrapped.__v252Original=oldCommit;
+      window.v212CommitMembersImport=wrapped;try{v212CommitMembersImport=wrapped;}catch(e){}
+    }
+  }catch(e){}
+
+  // Après import CSV historique : les auteurs des rounds doivent être pris en compte.
+  try{
+    const oldHist=window.extractReviewHistoryFromCsvRows || (typeof extractReviewHistoryFromCsvRows==='function'?extractReviewHistoryFromCsvRows:null);
+    if(typeof oldHist==='function'&&!oldHist.__v252Wrapped){
+      const wrapped=function(){const out=oldHist.apply(this,arguments);scheduleRoles();return out;};
+      wrapped.__v252Wrapped=true;wrapped.__v252Original=oldHist;
+      window.extractReviewHistoryFromCsvRows=wrapped;try{extractReviewHistoryFromCsvRows=wrapped;}catch(e){}
+    }
+  }catch(e){}
+
+  // Après Fusionner / Actualiser : recalcul final avec toutes les sources chargées.
+  try{
+    const oldProcess=window.processAllData || (typeof processAllData==='function'?processAllData:null);
+    if(typeof oldProcess==='function'&&!oldProcess.__v252Wrapped){
+      const wrapped=async function(){const out=await oldProcess.apply(this,arguments);scheduleRoles();setTimeout(lockDepb5Ui,350);setTimeout(lockDepb5Ui,1400);return out;};
+      wrapped.__v252Wrapped=true;wrapped.__v252Original=oldProcess;
+      window.processAllData=wrapped;try{processAllData=wrapped;}catch(e){}
+    }
+  }catch(e){}
+
+  function customBannerValue(){
+    try{return clean(typeof customBannerBase64!=='undefined'?customBannerBase64:'');}catch(e){return '';}
+  }
+  function lockDepb5Ui(){
+    try{if(typeof activeProject!=='undefined')activeProject='DEPB5';}catch(e){}
+    window.INJECTED_ACTIVE_PROJECT='DEPB5';
+    document.querySelectorAll('.dynamic-project-code').forEach(el=>{el.textContent='DEPB5';});
+    const selector=document.getElementById('project-selector');
+    if(selector){selector.innerHTML='<option value="DEPB5">DEPB5 - Déportation (Îlot B5)</option>';selector.value='DEPB5';selector.disabled=true;}
+    const banner=document.getElementById('project-banner-container');
+    const placeholder=document.getElementById('banner-placeholder');
+    if(banner){
+      /* V81 réattribue la photo ADCRM lors de chaque mutation DOM (donc après import).
+         Un verrou local et le CSS ci-dessus neutralisent définitivement ce visuel. */
+      banner.querySelectorAll('img.v81-project-banner-img').forEach(img=>{
+        img.style.setProperty('display','none','important');
+        img.style.setProperty('visibility','hidden','important');
+        img.setAttribute('aria-hidden','true');
+      });
+      const customBanner=customBannerValue();
+      if(!customBanner){
+        banner.classList.remove('v252-custom-banner');
+        banner.classList.add('v252-no-custom-banner');
+        banner.style.setProperty('background-image','none','important');
+        if(placeholder){
+          placeholder.style.setProperty('display','flex','important');
+          const label=placeholder.querySelector('span');
+          if(label)label.textContent='Projet DEPB5';
+        }
+      }else{
+        banner.classList.remove('v252-no-custom-banner');
+        banner.classList.add('v252-custom-banner');
+        banner.style.setProperty('background-image','url('+JSON.stringify(customBanner)+')','important');
+        banner.style.setProperty('background-size','cover','important');
+        banner.style.setProperty('background-position','center','important');
+        if(placeholder)placeholder.style.setProperty('display','none','important');
+      }
+    }
+  }
+  window.v252LockDepb5Ui=lockDepb5Ui;
+  try{
+    const oldRestore=window.restoreProjectState || (typeof restoreProjectState==='function'?restoreProjectState:null);
+    if(typeof oldRestore==='function'&&!oldRestore.__v252Wrapped){
+      const wrapped=function(){const out=oldRestore.apply(this,arguments);setTimeout(lockDepb5Ui,0);return out;};
+      wrapped.__v252Wrapped=true;wrapped.__v252Original=oldRestore;
+      window.restoreProjectState=wrapped;try{restoreProjectState=wrapped;}catch(e){}
+    }
+  }catch(e){}
+
+  lockDepb5Ui();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{lockDepb5Ui();scheduleRoles();},{once:true});
+  window.addEventListener('load',()=>{setTimeout(lockDepb5Ui,200);setTimeout(scheduleRoles,500);},{once:true});
+  setTimeout(lockDepb5Ui,2600);
+  try{document.title='CFLImmo - Dashboard Documentaire DEPB5 - V253';}catch(e){}
+  try{document.documentElement.setAttribute('data-dashboard-version','V253');}catch(e){}
+  console.info('[V253] Calcul des rôles bloquants isolé par fichier ; bannière héritée ADCRM neutralisée après import.');
+})();
+</script>
+
 </body>
 </html>
