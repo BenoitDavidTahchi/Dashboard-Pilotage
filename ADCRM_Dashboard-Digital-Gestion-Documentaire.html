@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CFLImmo - Dashboard Documentaire - V211</title>
+    <title>CFLImmo - Dashboard Documentaire - V232</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com">
 
@@ -649,7 +649,7 @@
 
                 <div class="bg-white dark:bg-slate-900/50 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative hover:border-slate-400 dark:hover:border-slate-600 transition-colors border-l-4 border-l-cyan-400">
                     <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mb-2"><span class="bg-slate-600 dark:bg-slate-500 text-white w-5 h-5 rounded-full inline-flex items-center justify-center text-xs">5</span> Historique WF</h3>
-                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mb-4">CSV Data Connector : review_comments, review_documents, reviews, workflow_notes.</p>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mb-4">CSV Data Connector : comments, documents, reviews, workflow_notes, candidates, steps et workflows (tasks optionnel).</p>
                     <input type="file" id="reviewHistoryInput" multiple accept=".csv,text/csv" class="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:font-semibold file:bg-cyan-50 dark:file:bg-cyan-900/30 file:text-cyan-700 dark:file:text-cyan-300 hover:file:bg-cyan-100 dark:hover:file:bg-cyan-800/50 cursor-pointer transition-colors"/>
                     <div class="status-history mt-3 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hidden flex flex-col gap-1"></div>
                 </div>
@@ -887,6 +887,7 @@
                         <select id="flt-conformite" onchange="applyFilters()" class="text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 rounded p-1.5 focus:ring-slate-500 focus:border-slate-500"><option value="">Conformité (Toutes)</option><option value="Conforme (Contractuelle)">Conforme (Contractuelle)</option><option value="Conforme (Technique)">Conforme (Fiches Techniques)</option><option value="Non Conforme">Non Conforme</option></select>
                         <select id="flt-approbation" onchange="applyFilters()" class="text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 rounded p-1.5 focus:ring-slate-500 focus:border-slate-500"><option value="">Approbation (Toutes)</option><option value="Validés">Validés (Visa A/B)</option><option value="Autres">Autres Statuts</option></select>
                         <select id="flt-statut" onchange="applyFilters()" class="text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 rounded p-1.5 focus:ring-slate-500 focus:border-slate-500"><option value="">Statut fichier ACC (Tous)</option></select>
+                        <select id="flt-wfglobal" onchange="applyFilters()" class="text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 rounded p-1.5" title="Statut global du workflow ACC, distinct du statut de révision du fichier"><option value="">Statut global WF (Tous)</option><option value="Ouvert">Ouvert</option><option value="Fermé">Fermé</option><option value="Invalidé">Invalidé</option><option value="Retourné à l’initiateur">Retourné à l’initiateur</option></select>
                         <select id="flt-wfname" onchange="applyFilters()" class="text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 rounded p-1.5 focus:ring-slate-500 focus:border-slate-500"><option value="">Nom WF (Tous)</option></select>
                         <select id="flt-lot" onchange="applyFilters()" class="text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 rounded p-1.5 focus:ring-slate-500 focus:border-slate-500"><option value="">Lot (Tous)</option></select>
                         <select id="flt-dossier" onchange="applyFilters()" class="text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-100 rounded p-1.5 focus:ring-slate-500 focus:border-slate-500"><option value="">Type Dossier (Tous)</option></select>
@@ -1026,6 +1027,10 @@
                     </div>
                 </div>
 
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-panel p-6 rounded-xl border border-slate-200 dark:border-slate-800"><h3 class="font-bold text-slate-900 dark:text-slate-100 mb-4">Rôles bloquants actuels</h3><div class="relative h-80"><canvas id="chartBlockingRoles"></canvas></div></div>
+                    <div class="glass-panel p-6 rounded-xl border border-slate-200 dark:border-slate-800"><h3 class="font-bold text-slate-900 dark:text-slate-100 mb-4">Entreprises bloquantes (EN…)</h3><div class="relative h-80"><canvas id="chartBlockingCompanies"></canvas></div></div>
+                </div>
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <div class="glass-panel p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow lg:col-span-2">
                         <h3 class="font-bold text-slate-900 dark:text-slate-100 mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">Répartition par types de fichier</h3>
@@ -1713,6 +1718,9 @@
         // --- Analyse avancée des rôles de workflows ACC ---
         const ROLE_ACRONYM_DEFINITIONS = {
             ARCH: { label: "Architectes MOG", companyHints: ["AREP"], roleHints: ["ARCH"] },
+            COBARCH: { label: "Coordinateur BIM ARCH", companyHints: [], roleHints: ["ARCH_BIM-COORDINATEUR", "ARCH BIM COORDINATEUR"] },
+            COBSTRU: { label: "Coordinateur BIM STRU", companyHints: [], roleHints: ["STRU_BIM-COORDINATEUR", "STRU BIM COORDINATEUR"] },
+            COBTSPE: { label: "Coordinateur BIM TSPE", companyHints: [], roleHints: ["TSPE_BIM-COORDINATEUR", "TSPE BIM COORDINATEUR"] },
             BDC:  { label: "Bureau de contrôle", companyHints: ["OGC"], roleHints: ["BUREAU-CONTROLE", "BUREAU CONTROLE", "OGCE"] },
             OA:   { label: "Organisme agréé", companyHints: ["SECO"], roleHints: ["ORGANISME", "AGREE", "AGRÉÉ", "SECO"] },
             CSS:  { label: "Coordinateur sécurité santé", companyHints: ["HBH"], roleHints: ["COSS", "COORDINATEUR-SECURITE", "COORDINATEUR SECURITE", "SECURITE-SANTE"] },
@@ -1743,7 +1751,31 @@
                 .replace(/^OGCE$/, 'BDC')
                 .replace(/^SECO$/, 'OA')
                 .replace(/^BIMMANAGER$/, 'MNB')
-                .replace(/^MANAGERBIM$/, 'MNB');
+                .replace(/^MANAGERBIM$/, 'MNB')
+                .replace(/^MOGMANDATAIRE(?:ADJOINT)?$/, 'MOG')
+                .replace(/^MOEGMANDATAIRE(?:ADJOINT)?$/, 'MOG');
+        }
+
+        // V225 : un commentaire supprimé reste supprimé après réimport d'un export
+        // ancien. Le nouvel ID d'un commentaire recréé reste une seule réponse
+        // pour son auteur et son rôle (pas une nouvelle personne).
+        function canonicalReviewComments(rows) {
+            const byId=new Map(),withoutId=[],fallback=new Set();
+            (rows||[]).forEach(r=>{
+                const id=String(r&&r.id||'').trim(),del=String(r&&r.deleted_at||'').trim();
+                if (!id) {
+                    const sig=[r.review_document_id,r.created_by,r.round_num,r.created_at,r.text,del].join('|');
+                    if(!fallback.has(sig)){fallback.add(sig);withoutId.push(r);}
+                    return;
+                }
+                const previous=byId.get(id);
+                if(!previous){byId.set(id,r);return;}
+                // A deletion tombstone always wins for that same ACC comment ID.
+                if(String(previous.deleted_at||'').trim()&&!del)return;
+                if(del&&!String(previous.deleted_at||'').trim()){byId.set(id,r);return;}
+                if(String(r.updated_at||r.created_at||'')>=String(previous.updated_at||previous.created_at||''))byId.set(id,r);
+            });
+            return [...byId.values(),...withoutId];
         }
 
         function uniqueCleanRoles(values) {
@@ -1804,15 +1836,12 @@
             let roles = [];
             let finalApprover = '';
 
-            // V81 — extraction renforcée des rôles WF pour les phases Chantier/EXE/BPE.
-            // Principe métier : après le délai xJ, le dernier acronyme est l'approbateur final,
-            // tout ce qui précède correspond aux rôles obligatoires.
-            // Exemples :
-            // LOT2.2_CHA_PLANS_10J_ARCH-BDC-OA-CSS-CERT_MOG  => ARCH,BDC,OA,CSS,CERT / MOG
-            // LOT2.1_EXE_PLANS-ARMATURES-COFFRAGE_11J_BDC_MOG (Régularisé) => BDC / MOG
+            // V222 — extraction des rôles avec prise en charge explicite des groupes COB(...).
+            // Exemple : LOT2.1_CHA_SCAN-3D_10J_COB(ARCH-STRU-TSPE)_MNB
+            // => COBARCH, COBSTRU, COBTSPE obligatoires / MNB approbateur final.
             compact = compact
-                .replace(/\([^)]*\)\s*$/g, '')       // supprime suffixe du type (Régularisé)
-                .replace(/\[[^\]]*\]\s*$/g, '')     // supprime suffixe du type [Régularisé]
+                .replace(/\([^)]*\)\s*$/g, '')
+                .replace(/\[[^\]]*\]\s*$/g, '')
                 .replace(/[-_]*(REGULARISE|REGULARIS[EÉ]|REGULARIZED|REGULARISED|CLOTURE|CLOTUREE|CLOSED)\s*$/i, '');
 
             const delayMatch = compact.match(/(?:^|_)(\d+)\s*J[_-](.+)$/i);
@@ -1820,22 +1849,28 @@
                 days = delayMatch[1] + 'J';
                 let afterDelay = String(delayMatch[2] || '').replace(/^[_-]+|[_-]+$/g, '');
 
-                // On coupe sur "_" car les familles descriptives avant xJ ne doivent jamais être relues comme rôles.
-                // Après xJ, ACC utilise normalement : ROLE-ROLE-ROLE_APPROBATEUR.
-                let tokens = afterDelay.split('_').map(t => t.trim()).filter(Boolean);
-
-                // Si des suffixes non-acronymes restent après l'approbateur, on les ignore.
-                tokens = tokens.filter(t => !/^(REGULARISE|REGULARIS[EÉ]|REGULARIZED|REGULARISED|CLOTURE|CLOTUREE|CLOSED)$/i.test(t));
-
-                if (tokens.length >= 2) {
-                    finalApprover = normalizeRoleCode(tokens[tokens.length - 1]);
-                    roles = parseRoleList(tokens.slice(0, -1).join('-').replace(/-/g, ','));
-                } else if (tokens.length === 1) {
-                    // Fallback ancien format : xJ_ROLE-ROLE-MOG sans underscore avant l'approbateur.
-                    const parts = String(tokens[0]).split('-').filter(Boolean);
-                    if (parts.length >= 2) {
-                        finalApprover = normalizeRoleCode(parts[parts.length - 1]);
-                        roles = parseRoleList(parts.slice(0, -1).join(','));
+                // Les workflows COB exigent bien des coordinateurs BIM de chaque discipline,
+                // et non n'importe quel membre ARCH/STRU/TSPE.
+                const cobMatch = afterDelay.match(/^COB(?:IM)?\(([^)]+)\)(?:_(.+))?$/i);
+                if (cobMatch) {
+                    const disciplineRoles = parseRoleList(cobMatch[1]);
+                    const cobMap = { ARCH: 'COBARCH', STRU: 'COBSTRU', TSPE: 'COBTSPE' };
+                    roles = uniqueCleanRoles(disciplineRoles.map(r => cobMap[r] || r));
+                    const tail = String(cobMatch[2] || '').split('_').map(t => t.trim()).filter(Boolean)
+                        .filter(t => !/^(REGULARISE|REGULARIS[EÉ]|REGULARIZED|REGULARISED|CLOTURE|CLOTUREE|CLOSED)$/i.test(t));
+                    if (tail.length) finalApprover = normalizeRoleCode(tail[tail.length - 1]);
+                } else {
+                    let tokens = afterDelay.split('_').map(t => t.trim()).filter(Boolean);
+                    tokens = tokens.filter(t => !/^(REGULARISE|REGULARIS[EÉ]|REGULARIZED|REGULARISED|CLOTURE|CLOTUREE|CLOSED)$/i.test(t));
+                    if (tokens.length >= 2) {
+                        finalApprover = normalizeRoleCode(tokens[tokens.length - 1]);
+                        roles = parseRoleList(tokens.slice(0, -1).join('-').replace(/-/g, ','));
+                    } else if (tokens.length === 1) {
+                        const parts = String(tokens[0]).split('-').filter(Boolean);
+                        if (parts.length >= 2) {
+                            finalApprover = normalizeRoleCode(parts[parts.length - 1]);
+                            roles = parseRoleList(parts.slice(0, -1).join(','));
+                        }
                     }
                 }
             }
@@ -1843,7 +1878,7 @@
             return {
                 name: original,
                 days,
-                requiredRoles: uniqueCleanRoles(roles.filter(r => r !== finalApprover)),
+                requiredRoles: uniqueCleanRoles(roles),
                 finalApprover: finalApprover === 'HAVAC' ? 'HVAC' : finalApprover
             };
         }
@@ -2088,11 +2123,22 @@
             const add = (code) => { const c = normalizeRoleCode(code); if (c) codes.push(c === 'HAVAC' ? 'HVAC' : c); };
             const roleParts = roleText.split(',').map(x => x.trim()).filter(Boolean);
             const rolePrefixes = roleParts.map(part => normalizeRoleCode(String(part || '').split('_')[0] || part));
+            const hasMogMandataireAttribute = roleParts.some(part => /^(?:MOG|MOEG)[_\s-]*MANDATAIRE(?:[_\s-]*ADJOINT)?$/i.test(String(part || '').trim()));
             const hasPrefix = (...vals) => vals.some(v => rolePrefixes.includes(normalizeRoleCode(v)) || roleText.includes(String(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()));
             const hasCompany = (...vals) => vals.some(v => companyText.includes(String(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()));
 
+            // Les préfixes explicites du fichier Membres sont exploitables pour
+            // toutes les disciplines (MNB, PMR, PAYS, etc.), pas seulement une liste
+            // figée. Les intitulés généraux MOE/MOEG ne deviennent pas MOG.
+            rolePrefixes.forEach(prefix => {
+                if (/^[A-Z]{2,8}$/.test(prefix) && !['MOE', 'MOEG'].includes(prefix) && !(prefix === 'MNB' && /\bOGC(?:E|X)?\b/.test(companyText))) add(prefix);
+            });
+
             // Mapping volontairement conservateur : on évite de faire correspondre tous les TPF à STRU, ou tous les ARCH à AREP.
-            if (hasCompany('AREP') || (hasPrefix('ARCH') && !hasCompany('BAPI', 'BALLINIPITT'))) add('ARCH');
+            if (hasPrefix('ARCH')) add('ARCH');
+            if (/(^|,\s*)ARCH_BIM-COORDINATEUR(?:\s*,|$)/i.test(roleText)) add('COBARCH');
+            if (/(^|,\s*)STRU_BIM-COORDINATEUR(?:\s*,|$)/i.test(roleText)) add('COBSTRU');
+            if (/(^|,\s*)TSPE_BIM-COORDINATEUR(?:\s*,|$)/i.test(roleText)) add('COBTSPE');
             if (hasCompany('OGC') || hasPrefix('BUCO', 'OGCE', 'BDC', 'BUREAU-CONTROLE', 'BUREAU CONTROLE')) add('BDC');
             if (hasCompany('SECO') || hasPrefix('OA', 'SECO', 'ORGANISME', 'ORGANISME-AGREE')) add('OA');
             if (hasCompany('HBH') || hasPrefix('CSS', 'COSS', 'COORDINATEUR-SECURITE', 'COORDINATEUR SECURITE')) add('CSS');
@@ -2103,7 +2149,9 @@
             if (hasPrefix('ELEC')) add('ELEC');
             if (hasPrefix('SPRK', 'SPRINKLER')) add('SPRK');
             if (hasPrefix('HVAC', 'HAVAC')) add('HVAC');
-            if (hasCompany('BAPI', 'BALLINIPITT') || hasPrefix('MOEG', 'MANDATAIRE')) add('MOG');
+            // La société ou MOEG_Chef-Projet ne prouve pas un mandat. Le rôle
+            // MOG provient d'un attribut Mandataire explicite du fichier Membres.
+            if (hasMogMandataireAttribute || roleParts.some(part => /^(MOG|MANDATAIRE)$/.test(part))) add('MOG');
             if (hasCompany('SCFL', 'CFL IMMO', 'CFLIMMO') || hasPrefix('SCFL_IMMO', 'CFL_IMMO', 'SCFL-IMMO')) add('MOD');
 
             return uniqueCleanRoles(codes);
@@ -2331,7 +2379,9 @@
             act.submitted = act.submitted || !!(options && options.submitted);
             const person = options && options.member ? (options.member.name || options.member.email || '') : '';
             if (person && !act.people.includes(person)) act.people.push(person);
-            act.count = Math.max(act.count || 0, 1);
+            // Plusieurs messages, y compris supprimés/recréés, ne constituent
+            // jamais plusieurs personnes ayant répondu pour une discipline.
+            act.count = act.people.length || Math.max(act.count || 0, 1);
             wfObj._hasRoleActivity = true;
         }
 
@@ -2500,10 +2550,21 @@
             const isClosed = isWorkflowClosedStatus(workflowStateOnly);
             const isInvalid = isWorkflowInvalidStatus(workflowStateOnly);
             const isInitiatorStage = isWorkflowWaitingForInitiator(wfObj);
-            const initiatorBlockingCompany = getInitiatorCompanyFromWorkflowName(wfObj.wfName || wfObj.name || '');
+            // V223 : priorité à l'entreprise réelle du créateur ACC de la revue,
+            // puis fallback au mapping du lot dans le nom du workflow.
+            const initiatorBlockingCompany = wfObj._v227MogTpfInitiator ? ''
+                : String(wfObj._v223InitiatorCompany || '').trim()
+                    || getInitiatorCompanyFromWorkflowName(wfObj.wfName || wfObj.name || '');
 
             if (hasWorkflowMappingRows) {
-                const notCommented = req.length ? req.filter(code => !wfActivityHasResponded(wfObj, code, false)) : [];
+                // V232 : une révision soumise satisfait le rôle obligatoire,
+                // même si aucun commentaire textuel n'a été saisi.
+                const notSubmitted = req.length ? req.filter(code => !wfActivityHasResponded(wfObj, code, true)) : [];
+                const submittedOnly = req.length ? req.filter(code => {
+                    const c = normalizeRoleCode(code);
+                    const act = c && wfObj.roleActivity ? wfObj.roleActivity[c] : null;
+                    return !!(act && act.submitted && !act.commented);
+                }) : [];
 
                 if (isClosed || isInvalid) {
                     // Priorité absolue : WF fermé / invalidé = aucun rôle bloquant, même si le texte contient MOG/MOD.
@@ -2511,22 +2572,23 @@
                 } else if (isInitiatorStage) {
                     // V81 : WF ouvert chez l'initiateur = blocage attribué à l'entreprise initiatrice du lot
                     // extraite du nom du WF : LOT2.2_... => EN2.2 - Clos & Couvert - (SCHNIDER).
-                    calculatedBlocked = [initiatorBlockingCompany || 'Initiateur'];
+                    // Un créateur TPF appartient à la MOG : le lot ne lui crée pas
+                    // artificiellement un rôle d'entreprise EN2.1 ou EN3.1.
+                    calculatedBlocked = wfObj._v227MogTpfInitiator ? [] : [initiatorBlockingCompany || 'Initiateur'];
                     submittedWithoutComment = [];
                 } else if (req.length && isFinalStep) {
-                    // Étape 2 : les rôles obligatoires de l'étape 1 qui n'ont pas commenté sont tracés comme
-                    // soumis sans commentaire, mais ne sont pas bloquants. En revanche, l'acronyme de
-                    // l'approbateur final devient bloquant si le WF est encore ouvert/bloqué chez lui.
-                    // Exemples attendus : MOG, MOD/CFLIMMO/SCFLIMMO, MNB.
-                    submittedWithoutComment = notCommented;
-                    calculatedBlocked = [];
-                    submittedWithoutComment.forEach(code => registerRoleActivity(wfObj, code, { submitted: true }));
-                    if (finalApprover && !wfActivityHasResponded(wfObj, finalApprover, false)) {
+                    // V232 : les réviseurs obligatoires ayant soumis sont non bloquants,
+                    // même sans texte. L'approbateur final reste géré par son étape active.
+                    submittedWithoutComment = submittedOnly;
+                    calculatedBlocked = notSubmitted.slice();
+                    if (finalApprover && !wfActivityHasResponded(wfObj, finalApprover, true)) {
                         calculatedBlocked.push(finalApprover);
                     }
                 } else if (req.length) {
-                    // Étape de revue active : seuls les rôles détectés dans les commentaires sont considérés répondus.
-                    calculatedBlocked = notCommented;
+                    // Étape de revue active : une soumission identifiée lève le blocage.
+                    // L'absence de texte reste signalée dans la colonne dédiée.
+                    submittedWithoutComment = submittedOnly;
+                    calculatedBlocked = notSubmitted;
                 }
             }
 
@@ -2541,13 +2603,15 @@
                 ? (isClosed || isInvalid
                     ? 'WF fermé/invalidé : aucun rôle bloquant forcé ; commentaires conservés pour traçabilité'
                     : (isInitiatorStage
-                        ? `Ouvert chez l’initiateur : blocage attribué à ${initiatorBlockingCompany || 'Initiateur'} d’après le lot du nom WF`
+                        ? (wfObj._v227MogTpfInitiator
+                            ? 'Ouvert chez l’initiateur MOG (TPF Engineering) : aucun rôle entreprise EN bloquant attribué'
+                            : `Ouvert chez l’initiateur : blocage attribué à ${initiatorBlockingCompany || 'Initiateur'} d’après le lot du nom WF`)
                         : (req.length
                             ? (isFinalStep
                                 ? (wfObj.rolesBlkList.length
-                                    ? 'Étape 2 : approbateur final bloquant détecté depuis absence dans commentaires (MOG / MOD-CFLImmo / MNB selon WF)'
-                                    : 'Étape 2 / approbation finale : rôles de revue manquants tracés comme soumis sans commentaire')
-                                : 'Calculé : rôles obligatoires du nom WF moins rôles détectés dans la colonne commentaires')
+                                    ? 'Étape finale : rôles sans aucune soumission encore bloquants ; approbateur final géré séparément'
+                                    : 'Étape finale : tous les réviseurs obligatoires ont soumis leur révision')
+                                : 'Calculé : rôles obligatoires du nom WF moins rôles ayant soumis leur révision')
                             : 'Aucun rôle obligatoire détecté dans le nom du workflow')) )
                 : 'WF non mappé : impossible de calculer les rôles bloquants';
             wfObj.__finalizedCacheKey = __cacheKey;
@@ -2681,11 +2745,15 @@
             { id: 'wfRolesReq', label: 'Rôles oblig.', width: 135, align: 'left', filterType: 'search' },
             { id: 'wfRolesBlk', label: 'Rôles bloquants', width: 145, align: 'left', filterType: 'search' },
             { id: 'wfApprover', label: 'Approb. final', width: 90, align: 'center', filterType: 'search' },
-            { id: 'statut', label: 'Statut', width: 100, align: 'left', filterType: 'statut' },
+            { id: 'statut', label: 'Statut ACC', width: 125, align: 'left', filterType: 'statut' },
+            { id: 'wfGlobal', label: 'Statut global WF', width: 145, align: 'left', filterType: 'wfglobal' },
+            { id: 'wfStep', label: 'Étape actuelle', width: 225, align: 'left', filterType: 'search' },
+            { id: 'revision', label: 'Statut révision (fichier)', width: 155, align: 'left', filterType: 'statut' },
             { id: 'path', label: 'Emplacement / Lot', width: 150, align: 'left', filterType: 'lot' },
             { id: 'comments', label: 'Commentaires', width: 180, align: 'left', filterType: 'search' },
             { id: 'wfRoundsHistory', label: 'Rounds WF', width: 220, align: 'left', filterType: 'search' },
             { id: 'wfProgressNotes', label: 'Notes WF', width: 220, align: 'left', filterType: 'search' },
+            { id: 'wfSilentSubmissions', label: 'Soumissions sans commentaire', width: 260, align: 'left', filterType: 'search' },
         ];
 
         function saveCurrentProjectState() {
@@ -3206,17 +3274,20 @@
            - reviews_review_documents*.csv
            - reviews_reviews*.csv
            - reviews_workflow_notes*.csv
-           Les autres tables peuvent être importées sans effet.
+           - reviews_review_candidates*.csv
+           - reviews_review_steps*.csv
+           - reviews_review_workflows*.csv
+           - reviews_review_tasks*.csv (optionnel)
         ========================================================== */
         function v57EmptyReviewHistoryState() {
             return {
-                raw: { comments: [], documents: [], reviews: [], notes: [] },
+                raw: { comments: [], documents: [], reviews: [], notes: [], candidates: [], steps: [], workflows: [], templates: [], tasks: [] },
                 byEntity: new Map(),
                 byReviewId: new Map(),
                 byReviewUrl: new Map(),
                 byWorkflowNumber: new Map(),
                 usersById: new Map(),
-                stats: { comments: 0, documents: 0, reviews: 0, notes: 0, entities: 0, reviewIds: 0 }
+                stats: { comments: 0, documents: 0, reviews: 0, notes: 0, candidates: 0, steps: 0, workflows: 0, tasks: 0, silentSubmissions: 0, entities: 0, reviewIds: 0 }
             };
         }
 
@@ -3228,11 +3299,12 @@
         function v57SerializableReviewHistoryState(state) {
             const s = state && state.byEntity instanceof Map ? state : v57EmptyReviewHistoryState();
             return {
-                raw: s.raw || { comments: [], documents: [], reviews: [], notes: [] },
+                raw: s.raw || { comments: [], documents: [], reviews: [], notes: [], candidates: [], steps: [], workflows: [], templates: [], tasks: [] },
                 byEntity: Array.from((s.byEntity || new Map()).entries()),
                 byReviewId: Array.from((s.byReviewId || new Map()).entries()),
                 byReviewUrl: Array.from((s.byReviewUrl || new Map()).entries()),
                 byWorkflowNumber: Array.from((s.byWorkflowNumber || new Map()).entries()),
+                historyIndexRevision: s.historyIndexRevision || 0,
                 usersById: Array.from((s.usersById || new Map()).entries()),
                 stats: s.stats || {}
             };
@@ -3246,6 +3318,7 @@
             s.byReviewId = new Map(serialized.byReviewId || []);
             s.byReviewUrl = new Map(serialized.byReviewUrl || []);
             s.byWorkflowNumber = new Map(serialized.byWorkflowNumber || []);
+            s.historyIndexRevision = serialized.historyIndexRevision || 0;
             s.usersById = new Map(serialized.usersById || []);
             s.stats = serialized.stats || s.stats;
             return s;
@@ -3490,7 +3563,7 @@
                 console.info('[Review History V81] Fichier ignoré (table non utilisée) :', fileName);
                 return;
             }
-            if (type === 'comments') s.raw.comments = s.raw.comments.concat(cleanRows);
+            if (type === 'comments') s.raw.comments = canonicalReviewComments(s.raw.comments.concat(cleanRows));
             if (type === 'documents') s.raw.documents = s.raw.documents.concat(cleanRows);
             if (type === 'notes') s.raw.notes = s.raw.notes.concat(cleanRows);
             if (type === 'reviews') s.raw.reviews = s.raw.reviews.concat(cleanRows);
@@ -3503,7 +3576,7 @@
             const notesByReview = new Map();
             const reviewsById = new Map();
 
-            (s.raw.comments || []).forEach(r => {
+            canonicalReviewComments(s.raw.comments || []).forEach(r => {
                 if (String(v57Cell(r, ['deleted_at']) || '').trim()) return;
                 const docId = v57Cell(r, ['review_document_id']);
                 const txt = v57Cell(r, ['text']);
@@ -3640,7 +3713,15 @@
                     historyScope: 'file'
                 };
 
-                (bucket.keys || new Set()).forEach(k => s.byEntity.set(k, entry));
+                // Une même version de fichier peut être envoyée successivement dans
+                // plusieurs WF. Conserver toutes les associations URN + review_id.
+                (bucket.keys || new Set()).forEach(k => {
+                    const previous = s.byEntity.get(k);
+                    if (!previous) s.byEntity.set(k, entry);
+                    else if (Array.isArray(previous)) {
+                        if (!previous.some(candidate => candidate.reviewId === reviewId)) previous.push(entry);
+                    } else if (previous.reviewId !== reviewId) s.byEntity.set(k, [previous, entry]);
+                });
             });
 
             reviewsById.forEach((meta, reviewId) => {
@@ -3674,6 +3755,7 @@
                 reviewIds: s.byReviewId.size,
                 fileBuckets: fileBuckets.size
             };
+            s.historyIndexRevision = 229;
             window.__reviewHistoryStats = s.stats;
             document.querySelectorAll('.status-history').forEach(el => {
                 el.classList.remove('hidden');
@@ -3684,6 +3766,19 @@
 
         function v57FindHistoryForDocument(params) {
             const s = v57EnsureReviewHistoryState();
+            // Les sessions conservées avec l'ancien index à entrée unique doivent
+            // reconstruire les associations de fichier après chargement.
+            if (s.historyIndexRevision !== 229 && s.raw && (s.raw.reviews || []).length && (s.raw.documents || []).length) {
+                v57BuildReviewHistoryIndexes();
+            }
+            const wf = params && params.wfData || {};
+            const wfNumber = v57WorkflowNumberKey(wf.id || '');
+            const knownReview = [wf.reviewId, wf.wfUrl, params && params.workflowUrl].map(value => {
+                const match = String(value || '').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ig);
+                return match && match.length ? match[match.length - 1].toLowerCase() : '';
+            }).find(id => id && s.byReviewId.has(v57ReviewUuidKey(id))) || '';
+            const knownSequence = wfNumber ? s.byWorkflowNumber.get(wfNumber) : null;
+            const expectedReviewId = knownReview || (knownSequence && knownSequence.reviewId) || '';
             const checks = [];
             const addKey = (kind, key) => { if (key) checks.push([kind, key]); };
             const addEntity = (value) => v57EntityKeys(value).forEach(k => addKey('entity', k));
@@ -3703,14 +3798,19 @@
                 } catch (e) {}
                 addKey('reviewId', v57ReviewUuidKey(u));
             });
-            const wfNumber = params && params.wfData ? (params.wfData.id || '') : '';
-            addKey('workflowNumber', v57WorkflowNumberKey(wfNumber));
+            addKey('workflowNumber', wfNumber);
             for (const [kind, key] of checks) {
                 const obj = kind === 'entity' ? s.byEntity.get(key)
                     : kind === 'reviewUrl' ? s.byReviewUrl.get(key)
                     : kind === 'workflowNumber' ? s.byWorkflowNumber.get(key)
                     : s.byReviewId.get(key);
-                if (obj) return obj;
+                const candidates = Array.isArray(obj) ? obj : obj ? [obj] : [];
+                const matched = candidates.filter(entry =>
+                    (!expectedReviewId || String(entry.reviewId).toLowerCase() === expectedReviewId)
+                    && (!wfNumber || v57WorkflowNumberKey(entry.sequenceId) === wfNumber));
+                // Sans identifiant WF fiable, ne jamais choisir arbitrairement
+                // parmi plusieurs historiques du même fichier/version.
+                if (matched.length === 1) return matched[0];
             }
             return {};
         }
@@ -4510,7 +4610,7 @@
 
                 return { 
                     ...row, extractedNom: nomComplet, extractedDesc: desc, extractedChemin: cheminComplet, extractedVersion: version,
-                    extractedAccFileStatusRaw: status, extractedStatus: statusAccFinal, extractedWorkflow: workflowStr, extractedComments: commentsStr, extractedWfRoundsHistory: v58HistResolved.rounds || '', extractedWfProgressNotes: v58HistResolved.notes || '', extractedPha: originalPha, extractedEmett: originalEmett, extractedSpe: originalSpe,
+                    extractedAccFileStatusRaw: status, extractedStatus: statusAccFinal, extractedWorkflow: workflowStr, extractedComments: commentsStr, extractedWfRoundsHistory: v58HistResolved.rounds || '', extractedWfProgressNotes: v58HistResolved.notes || '', extractedWfSilentSubmissions: (v57Hist && v57Hist.silentSubmissions) || '', extractedPha: originalPha, extractedEmett: originalEmett, extractedSpe: originalSpe,
                     extractedNiv: originalNiv, extractedTyp: originalTyp, extractedInd: originalInd, baseName, exactName, format, conformity: conf, dossierType, 
                     isApproved: status.toLowerCase().includes('approuv') || status.toLowerCase().includes('approved') || status.toLowerCase().includes('visa a') || status.toLowerCase().includes('visa b'), 
                     isDuplicated, lot, isOldFolder, isCommentFolder,
@@ -4740,7 +4840,7 @@
             }
         }
 
-        const MULTI_FILTER_IDS = ['flt-conformite', 'flt-approbation', 'flt-duplique', 'flt-wfname', 'flt-lot', 'flt-dossier', 'flt-format', 'flt-pha', 'flt-emett', 'flt-spe', 'flt-niv', 'flt-typ1', 'flt-typ2', 'flt-ind', 'flt-ver', 'flt-statut'];
+        const MULTI_FILTER_IDS = ['flt-conformite', 'flt-approbation', 'flt-duplique', 'flt-wfglobal','flt-wfname', 'flt-lot', 'flt-dossier', 'flt-format', 'flt-pha', 'flt-emett', 'flt-spe', 'flt-niv', 'flt-typ1', 'flt-typ2', 'flt-ind', 'flt-ver', 'flt-statut'];
         const multiFilterSearchTerms = {};
         function isMultiFilter(id) { return MULTI_FILTER_IDS.includes(id); }
 
@@ -4990,7 +5090,7 @@
         function hasFilterValue(id) { return getFilterValues(id).length > 0; }
 
         function clearFilters() {
-            ['flt-conformite', 'flt-approbation', 'flt-duplique', 'flt-wfname', 'flt-lot', 'flt-dossier', 'flt-format', 'flt-pha', 'flt-emett', 'flt-spe', 'flt-niv', 'flt-typ1', 'flt-typ2', 'flt-ind', 'flt-ver', 'flt-statut', 'flt-search', 'flt-archive-state'].forEach(id => { 
+            ['flt-conformite', 'flt-approbation', 'flt-duplique', 'flt-wfglobal','flt-wfname', 'flt-lot', 'flt-dossier', 'flt-format', 'flt-pha', 'flt-emett', 'flt-spe', 'flt-niv', 'flt-typ1', 'flt-typ2', 'flt-ind', 'flt-ver', 'flt-statut', 'flt-search', 'flt-archive-state'].forEach(id => { 
                 clearFilterElement(id);
             });
             currentPathFilter = ''; 
@@ -5009,7 +5109,7 @@
                 clearQuickFilters(); 
             } else {
                 activeQuickFilterType = type;
-                ['flt-conformite', 'flt-approbation', 'flt-duplique', 'flt-wfname', 'flt-lot', 'flt-dossier', 'flt-format', 'flt-pha', 'flt-emett', 'flt-spe', 'flt-niv', 'flt-typ1', 'flt-typ2', 'flt-ind', 'flt-ver', 'flt-statut', 'flt-search', 'flt-archive-state'].forEach(id => clearFilterElement(id));
+                ['flt-conformite', 'flt-approbation', 'flt-duplique', 'flt-wfglobal','flt-wfname', 'flt-lot', 'flt-dossier', 'flt-format', 'flt-pha', 'flt-emett', 'flt-spe', 'flt-niv', 'flt-typ1', 'flt-typ2', 'flt-ind', 'flt-ver', 'flt-statut', 'flt-search', 'flt-archive-state'].forEach(id => clearFilterElement(id));
                 currentPathFilter = '';
                 const setVal = (id, val) => setFilterValues(id, val);
                 
@@ -5031,7 +5131,7 @@
         function crossFilter(type, rawValue) {
             if (!type || rawValue === undefined || rawValue === null || rawValue === '' || rawValue === '-') return;
             
-            ['flt-conformite', 'flt-approbation', 'flt-duplique', 'flt-wfname', 'flt-lot', 'flt-dossier', 'flt-format', 'flt-pha', 'flt-emett', 'flt-spe', 'flt-niv', 'flt-typ1', 'flt-typ2', 'flt-ind', 'flt-ver', 'flt-statut', 'flt-description', 'flt-search', 'flt-archive-state'].forEach(id => clearFilterElement(id));
+            ['flt-conformite', 'flt-approbation', 'flt-duplique', 'flt-wfglobal','flt-wfname', 'flt-lot', 'flt-dossier', 'flt-format', 'flt-pha', 'flt-emett', 'flt-spe', 'flt-niv', 'flt-typ1', 'flt-typ2', 'flt-ind', 'flt-ver', 'flt-statut', 'flt-description', 'flt-search', 'flt-archive-state'].forEach(id => clearFilterElement(id));
             currentPathFilter = '';
             
             if (type === 'lot') {
@@ -5088,6 +5188,22 @@
             enableMultiSelectFilters();
         };
 
+        function canonicalWorkflowStatus(row) {
+            const wf = row && row.wfData || {};
+            const raw = String((row && row.extractedWfGlobalStatus) || wf.globStat || '').trim();
+            const n = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+            const status = n(raw);
+            const step = n(String((row && row.extractedCurrentStep) || wf.step || '').split('(')[0]);
+            if (/INVALID|CADUC|VOID|CANCEL|ANNULE/.test(status)) return 'Invalidé';
+            if (/FERME|CLOTUR|CLOSED|COMPLETED|TERMINE|APPROUV|APPROVED|VALIDE/.test(status)) return 'Fermé';
+            if (/OUVERT|OPEN|EN COURS|IN PROGRESS|ATTENTE|PENDING|RESTARTING|RETURNED|WAITING/.test(status)) {
+                if (/INITIATEUR|INITIATOR|RETOURNE|RETURNED|RESTARTING|EMETTEUR|SENDER/.test(status + ' ' + step)) return 'Retourné à l’initiateur';
+                return 'Ouvert';
+            }
+            return '';
+        }
+        window.canonicalWorkflowStatus = canonicalWorkflowStatus;
+
         function populateFilters() {
             const phaC={}, emettC={}, speC={}, nivC={}, typ1C={}, typ2C={}, indC={}, verC={}, statutC={}, wfNameC={}, lotC={}, dossierC={}, formatC={};
 
@@ -5124,6 +5240,7 @@
                 if(v && v !== '-') verC[v] = (verC[v]||0)+1;
                 const accFileStatusRaw = String(r.extractedAccFileStatusRaw || r.extractedStatus || '').trim();
                 if(accFileStatusRaw) statutC[accFileStatusRaw] = (statutC[accFileStatusRaw]||0)+1;
+                
                 if(r.extractedWfName && r.extractedWfName !== '-') wfNameC[r.extractedWfName] = (wfNameC[r.extractedWfName]||0)+1;
                 if(r.lot !== 'Autre') lotC[r.lot] = (lotC[r.lot]||0)+1;
                 if(r.dossierType) dossierC[r.dossierType] = (dossierC[r.dossierType]||0)+1;
@@ -5168,7 +5285,7 @@
                 if (!matchesFilter(lotFilter, r.lot)) return false; if (!matchesFilter(dossier, r.dossierType)) return false; if (!matchesFilter(formatFlt, r.format)) return false;
                 if (!matchesFilter(pha, rPha)) return false; if (!matchesFilter(emett, rEmett)) return false; if (!matchesFilter(spe, rSpe)) return false; 
                 if (!matchesFilter(niv, rNiv)) return false; if (!matchesFilter(typ1, rTyp1)) return false; if (!matchesFilter(typ2, rTyp2)) return false; if (!matchesFilter(ind, rInd)) return false; if (!matchesFilter(ver, rVer)) return false;
-                if (!matchesFilter(statut, String(r.extractedAccFileStatusRaw || r.extractedStatus || '').trim())) return false;
+                if (!matchesFilter(statut, String(r.extractedAccFileStatusRaw || r.extractedRevisionStatus || r.extractedStatus || '').trim())) return false;
                 if (!matchesFilter(wfNameFilter, rWfName)) return false;
                 
                 if (currentPathFilter && !(r.extractedChemin || '').replace(/\\/g, '/').includes(currentPathFilter)) return false;
@@ -5348,6 +5465,7 @@
                     const comments = row.extractedComments || '-';
                     const wfRoundsHistory = row.extractedWfRoundsHistory || '-';
                     const wfProgressNotes = row.extractedWfProgressNotes || '-';
+                    const wfSilentSubmissions = row.extractedWfSilentSubmissions || '-';
 
                     const safeReason = escapeHtml(conf.reason); const safePath = escapeHtml(row.extractedChemin);
                     const shortPath = escapeHtml(row.extractedChemin ? '.../' + row.extractedChemin.split(/[/\\]/).slice(-2).join('/') : '');
@@ -5440,11 +5558,28 @@
                         case 'wfProgressNotes':
                             content = v60RenderRichSnippet(wfProgressNotes, 'text-[10px]');
                             filterVal = wfProgressNotes; break;
+                        case 'wfSilentSubmissions':
+                            if (wfSilentSubmissions && wfSilentSubmissions !== '-') {
+                                content = `<div class="rounded-md border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 px-2 py-1 text-[10px] font-semibold text-red-700 dark:text-red-300">${v60RenderRichSnippet(wfSilentSubmissions, 'text-[10px]')}</div>`;
+                            } else { content = '-'; }
+                            filterVal = wfSilentSubmissions; break;
                         case 'path':
                             content = `<div class="text-[9px] font-semibold text-slate-700 dark:text-slate-300 truncate w-full" title="${escapeHtml(row.lot)} | ${escapeHtml(String(row.dossierType).replace('Dossier ', ''))}">${escapeHtml(row.lot)} | ${escapeHtml(String(row.dossierType).replace('Dossier ', ''))}</div><div class="text-[8px] text-slate-400 dark:text-slate-500 truncate w-full" title="${safePath}">${shortPath}</div>`;
                             filterVal = row.lot; break;
+                        case 'wfGlobal':
+                            const wfState = canonicalWorkflowStatus(row);
+                            content = wfState ? `<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">${escapeHtml(wfState)}</span>` : '-';
+                            filterVal = wfState; break;
+                        case 'wfStep':
+                            const wfStage = String(row.extractedCurrentStep || row.wfData?.step || '').trim();
+                            content = `<span class="text-[10px]" title="${escapeHtml(wfStage)}">${escapeHtml(wfStage || '-')}</span>`;
+                            filterVal = wfStage; break;
+                        case 'revision':
+                            const fileRevision = String(row.extractedRevisionStatus || row.wfData?.revStat || row.extractedAccFileStatusRaw || '').trim();
+                            content = escapeHtml(fileRevision || '-'); filterVal = fileRevision; break;
                         case 'statut':
-                            const accFileStatusDisplay = String(row.extractedAccFileStatusRaw || row.extractedStatus || '').trim();
+                            const wfGlobalForAcc = canonicalWorkflowStatus(row);
+                            const accFileStatusDisplay = wfGlobalForAcc === 'Ouvert' ? 'Revue en cours' : wfGlobalForAcc === 'Retourné à l’initiateur' ? 'Retourné chez l’initiateur' : wfGlobalForAcc === 'Invalidé' ? 'CADUC' : String(row.extractedStatus || row.extractedAccFileStatusRaw || '').trim();
                             if (/approuv|approved|visa\s*[ab]|valid[ée]/i.test(accFileStatusDisplay)) content = `<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 border-emerald-800 text-emerald-700 dark:text-emerald-400 shadow-sm">${escapeHtml(accFileStatusDisplay)}</span>`;
                             else if (/refus|rejet|rejected|visa\s*c|caduc|invalid/i.test(accFileStatusDisplay)) content = `<span class="px-2 py-0.5 rounded text-[10px] bg-red-50 dark:bg-red-900/30 border border-red-200 border-red-800 text-red-700 dark:text-red-400 shadow-sm">${escapeHtml(accFileStatusDisplay)}</span>`;
                             else content = `<span class="px-2 py-0.5 rounded text-[10px] bg-white dark:bg-slate-950 border border-slate-200 border-slate-700 text-slate-600 dark:text-slate-300 shadow-sm">${escapeHtml(accFileStatusDisplay)}</span>`;
@@ -5467,7 +5602,7 @@
                     const safeFilterVal = escapeJs(String(filterVal));
                     const onClickAction = col.filterType ? `onclick="crossFilter('${col.filterType}', '${safeFilterVal}')"` : `onclick="crossFilter('search', '${safeFilterVal}')"`;
                     const previewText = v60NormalizeTextForDisplay(filterVal);
-                    const isLongTextColumn = ['comments', 'wfRoundsHistory', 'wfProgressNotes'].includes(col.id);
+                    const isLongTextColumn = ['comments', 'wfRoundsHistory', 'wfProgressNotes', 'wfSilentSubmissions'].includes(col.id);
                     const showFullPreview = isLongTextColumn && previewText && previewText !== '-';
                     const fullTextAttr = showFullPreview ? ` data-full-text="${escapeHtml(previewText)}"` : (v60TextIsLong(previewText) ? ` data-full-text="${escapeHtml(previewText)}"` : '');
                     const titleAttr = (showFullPreview || v60TextIsLong(previewText)) ? '' : ` title="Cliquez pour filtrer sur '${escapeHtml(filterVal)}'"`;
@@ -6512,6 +6647,7 @@
                     case 'comments': return row.extractedComments || '-';
                     case 'wfRoundsHistory': return row.extractedWfRoundsHistory || '-';
                     case 'wfProgressNotes': return row.extractedWfProgressNotes || '-';
+                    case 'wfSilentSubmissions': return row.extractedWfSilentSubmissions || '-';
                     default: return row[colId] || '';
                 }
             }
@@ -8074,8 +8210,8 @@
             style.id = 'v70-locked-css';
             style.textContent = `
                 html.v70-locked-interface .resize-handle {
-                    display: none !important;
-                    pointer-events: none !important;
+                    display: block !important;
+                    pointer-events: auto !important;
                 }
 
                 html.v70-locked-interface th,
@@ -8134,9 +8270,7 @@
                 th.classList.remove('dragging', 'drag-over-left', 'drag-over-right');
             });
 
-            document.querySelectorAll('.resize-handle').forEach(handle => {
-                handle.remove();
-            });
+            // Les poignées de largeur restent disponibles malgré le gel des autres contrôles.
         }
 
         function v70DisableProjectEditingIfNeeded() {
@@ -8253,7 +8387,7 @@
             height: auto !important;
             object-fit: contain !important;
             object-position: center center !important;
-            filter: none !important;
+            filter: grayscale(100%) !important;
             opacity: 1 !important;
             transform: none !important;
             border: 0 !important;
@@ -8292,7 +8426,7 @@
             height: auto !important;
             object-fit: contain !important;
             object-position: center center !important;
-            filter: none !important;
+            filter: grayscale(100%) !important;
             opacity: 1 !important;
             transform: none !important;
             border: 0 !important;
@@ -9604,7 +9738,7 @@
     function v92WorkflowStatus(row) {
         if (!v92HasWorkflow(row)) return 'Aucun workflow lancé';
         const wf = row && row.wfData ? row.wfData : {};
-        return v92CleanLabel(row && (row.extractedWfGlobalStatus || row.extractedCurrentStep || row.extractedRevisionStatus) || wf.globStat || wf.step || 'Workflow lancé');
+        return typeof window.canonicalWorkflowStatus === 'function' ? (window.canonicalWorkflowStatus(row) || 'Statut WF non renseigné') : v92CleanLabel(wf.globStat || 'Statut WF non renseigné');
     }
 
     function v92FileStatus(row) {
@@ -14314,24 +14448,114 @@
     }
     function dueValue(row){ const wf = row && row.wfData ? row.wfData : {}; return first(wf.dateE, row && row.extractedDueDate, row && row.extractedWfDueDate, rawFind(row, ['échéance','echeance','due le','due date','deadline','date limite'])); }
     window.v106IsRowOverdue = function(row){ const p = parseDate(dueValue(row)); if (!p) return false; const now = new Date(); const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(); return p.ts < (p.dateOnly ? today : now.getTime()); };
-    function blockingRoles(row){ const wf = row && row.wfData ? row.wfData : {}; return first(row && row.extractedRolesBlk, wf.rolesBlkCalculated, wf.rolesBlk, rawFind(row, ['rôles bloquants','roles bloquants','blocking roles'])); }
+    function blockingRoles(row){
+        // V220 : un rôle bloquant n'est exploitable que pour une ligne documentaire
+        // explicitement Ouverte / En cours / En revue. Toute autre valeur, notamment
+        // Rejeté avec commentaires, est hors périmètre même si un rôle WF ancien subsiste.
+        try{if(typeof window.v218IsBlockingEligibleRow==='function'&&!window.v218IsBlockingEligibleRow(row))return'';}catch(e){}
+        const wf = row && row.wfData ? row.wfData : {};
+        // Lors d'un retour à l'initiateur MOG, ignorer les anciennes valeurs EN
+        // conservées en cache. Pendant la revue, les vrais réviseurs restent bloquants.
+        if(wf._v227MogTpfInitiator){
+            try{if(typeof isWorkflowWaitingForInitiator==='function'&&isWorkflowWaitingForInitiator(wf))return'';}catch(e){}
+        }
+        // Le calcul consolidé du WF est prioritaire. Une ancienne valeur de ligne
+        // (ou un simple tiret) ne doit jamais masquer les rôles recalculés.
+        const values = [wf.rolesBlkCalculated, row && row.extractedRolesBlk, wf.rolesBlk, rawFind(row, ['rôles bloquants','roles bloquants','blocking roles'])];
+        for (const value of values) {
+            const txt = String(value == null ? '' : value).trim();
+            if (txt && !/^[-–—]+$/.test(txt) && !/^(aucun|none|no blocking role|pas de role bloquant)$/i.test(norm(txt))) return txt;
+        }
+        return '';
+    }
+    function blockingRoleTokens(row){
+        const txt=String(blockingRoles(row)||'').trim();
+        if(!txt)return[];
+        const out=[];
+        let parts=[];
+        try{if(typeof parseRoleList==='function'&&!/(?:^|[,;|]\s*)EN[0-9]/i.test(txt))parts=parseRoleList(txt)||[];}catch(e){}
+        if(!parts.length)parts=txt.split(/[,;|]+/);
+        parts.forEach(part=>{
+            let token=String(part||'').trim();if(!token)return;
+            try{if(typeof normalizeRoleCode==='function')token=normalizeRoleCode(token)||token;}catch(e){}
+            token=norm(token);if(token&&!out.includes(token))out.push(token);
+        });
+        return out;
+    }
     window.v106HasBlockingRoles = function(row, roleValue){
-        const txt = String(blockingRoles(row) || '').trim();
-        const n = norm(txt);
-        if (!n || /^[-–—]+$/.test(n) || /^(aucun|none|no blocking role|pas de role bloquant)$/.test(n)) return false;
-        const wanted = norm(roleValue || '');
-        if (!wanted) return true;
-        return n.split(/[,;|\/]+/).map(x => norm(x)).some(x => x === wanted || x.includes(wanted));
+        const tokens=blockingRoleTokens(row);if(!tokens.length)return false;
+        let wanted=String(roleValue||'').trim();
+        try{if(typeof normalizeRoleCode==='function')wanted=normalizeRoleCode(wanted)||wanted;}catch(e){}
+        wanted=norm(wanted);if(!wanted)return true;
+        return tokens.some(token=>token===wanted || (/^en[0-9]/.test(wanted)&&token.startsWith(wanted)&&!/[0-9.]/.test(token.charAt(wanted.length))));
     };
     function allRows(){ try { if (Array.isArray(processedData)) return processedData; } catch(e) {} try { if (Array.isArray(window.processedData)) return window.processedData; } catch(e) {} return []; }
-    function roleList(){
-        const set = new Set();
+    function blockingFilterCatalog(){
+        const roleMap = new Map();
+        const companyMap = new Map();
+        // Ces intitulés décrivent les lots ADCRM ; la valeur du filtre reste
+        // toujours le code EN afin que le libellé n'affecte pas les résultats.
+        const lotNames={
+            EN00:'Parking provisoire',
+            EN01:'Terrassement & Blindage',
+            'EN2.1':'Gros Oeuvre',
+            'EN2.2':'Clos & Couvert',
+            'EN3.1':'Techniques Spéciales',
+            'EN3.3':'Appareils de levage',
+            EN04:'Parachèvement'
+        };
+        const putRole = (value,row) => {
+            let raw=String(value||'').trim(); if(!raw||/^[-–—]+$/.test(raw))return;
+            let code=''; try{code=typeof normalizeRoleCode==='function'?normalizeRoleCode(raw):norm(raw);}catch(e){code=norm(raw);}
+            if(!code||/^(AUCUN|NONE)$/.test(norm(raw)))return;
+            const known=(typeof ROLE_ACRONYM_DEFINITIONS!=='undefined'&&ROLE_ACRONYM_DEFINITIONS[code])||/^COB(?:ARCH|STRU|TSPE)$/.test(code);
+            if(!known)return putCompany(raw,row);
+            // Un seul choix par acronyme effectivement bloquant.
+            const label=code==='HAVAC'?'HVAC':code;
+            roleMap.set(label,label);
+        };
+        const putCompany = (value,row) => {
+            const raw=String(value||'').trim();
+            if(!raw||/^[-–—]+$/.test(raw)||/^(AUCUN|NONE)$/i.test(norm(raw)))return;
+            // Regrouper EN2.1_Chef-Projet, EN2.1 - CLE-CBL et EN2.1 Gros-Oeuvre
+            // sous une seule option, dont la valeur filtrante est le code EN2.1.
+            const normalizedRaw = raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
+            const match=normalizedRaw.match(/^EN(\d+(?:[._]\d+)?)(?![\d.])/);
+            if(!match)return;
+            if(/\bTPF(?:E|S|T)?\b/.test(normalizedRaw))return;
+            const code='EN'+match[1].replace('_','.');
+            let name=lotNames[code]||'';
+            if(!name){
+                // Pour un nouveau lot, exploiter son nom importé lorsqu'il
+                // correspond bien au code EN observé sur cette ligne.
+                const lot=String(row&&(row.lot||row.extractedLot||row.Lot)||'');
+                const description=lot.match(/\bLOT\s*(\d+(?:[._]\d+)?)\s*\(([^)]+)\)/i);
+                if(description&&'EN'+description[1].replace('_','.')===code)name=description[2].trim();
+            }
+            const label=code+(name?' '+name:'');
+            const previous=companyMap.get(code);
+            if(!previous||label.length>previous.label.length)companyMap.set(code,{code,label});
+        };
         allRows().forEach(r => {
-            const txt = String(blockingRoles(r) || '').trim();
-            if (!txt || /^[-–—]+$/.test(txt)) return;
-            txt.split(/[,;|\/]+/).map(x => x.trim()).filter(Boolean).forEach(x => { if (!/^(aucun|none)$/i.test(norm(x))) set.add(x); });
+            // Source de vérité : seuls les blocages actuels présents sur au moins
+            // un fichier d'un WF chargé peuvent figurer dans les choix du menu.
+            const wf=r&&r.wfData||{};
+            const wfId=String(wf.id||r&&r.extractedWorkflow||'').trim();
+            if(!/\d{2,}/.test(wfId))return;
+            const txt=String(blockingRoles(r)||'').trim();
+            if(txt&&!/^[-–—]+$/.test(txt)){
+                txt.split(/[,;|]+/).map(x=>x.trim()).filter(Boolean).forEach(item=>{
+                    let code='';try{code=typeof normalizeRoleCode==='function'?normalizeRoleCode(item):norm(item);}catch(e){code=norm(item);}
+                    const known=(typeof ROLE_ACRONYM_DEFINITIONS!=='undefined'&&ROLE_ACRONYM_DEFINITIONS[code])||/^COB(?:ARCH|STRU|TSPE)$/.test(code);
+                    if(known)putRole(item,r);else putCompany(item,r);
+                });
+            }
         });
-        return Array.from(set).sort((a,b) => norm(a).localeCompare(norm(b), 'fr', { numeric:true, sensitivity:'base' }));
+        const sorter=(a,b)=>norm(a).localeCompare(norm(b),'fr',{numeric:true,sensitivity:'base'});
+        return {roles:Array.from(roleMap.values()).sort(sorter),companies:Array.from(companyMap.values()).sort((a,b)=>sorter(a.code,b.code))};
+    }
+    function roleList(){
+        const c=blockingFilterCatalog();return c.roles.concat(c.companies.map(x=>x.code));
     }
     function updateButtons(){
         const overdue = document.getElementById('v106-filter-overdue');
@@ -14353,11 +14577,25 @@
     }
     function refreshRoleSelect(){
         const select = document.getElementById('v106-blocking-role-select'); if (!select) return;
-        const current = select.value || '';
-        const roles = roleList();
-        select.innerHTML = '<option value="">Tous les rôles bloquants</option>' + roles.map(r => `<option value="${String(r).replace(/"/g,'&quot;')}">${r}</option>`).join('');
-        if (roles.includes(current)) select.value = current;
+        const current = window.__v106BlockingRoleValue || select.value || '';
+        const catalog = blockingFilterCatalog();
+        const esc=v=>String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        let html='<option value="">Tous les rôles / entreprises bloquants</option>';
+        if(catalog.roles.length)html+='<optgroup label="Rôles bloquants">'+catalog.roles.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('')+'</optgroup>';
+        if(catalog.companies.length)html+='<optgroup label="Rôles entreprises (EN…)">'+catalog.companies.map(r=>`<option value="${esc(r.code)}">${esc(r.label)}</option>`).join('')+'</optgroup>';
+        select.innerHTML=html;
+        const normalized=String(current).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
+        const enMatch=normalized.match(/^EN(\d+(?:[._]\d+)?)(?![\d.])/);
+        const code=enMatch?'EN'+enMatch[1].replace('_','.') : (typeof normalizeRoleCode==='function'?normalizeRoleCode(current):normalized);
+        if(catalog.roles.includes(code)||catalog.companies.some(company=>company.code===code)){
+            select.value=code;
+            if(window.__v106BlockingRoleValue)window.__v106BlockingRoleValue=code;
+        }else if(current){
+            select.value='';window.__v106BlockingRoleValue='';
+            if(window.__v106FilterBlockingRoles&&typeof window.applyFilters==='function')window.applyFilters();
+        }
     }
+    window.v106RefreshRoleSelect=refreshRoleSelect;
     function injectUI(){
         const exportBtn = document.querySelector('button[onclick*="exportExeExcel"]');
         if (!exportBtn) return;
@@ -14373,8 +14611,8 @@
             <button id="v106-filter-blocking" type="button" class="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-900/30 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 text-xs font-bold rounded shadow-sm" title="Filtrer les fichiers ayant au moins un rôle bloquant">
                 <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> Rôles bloquants
             </button>
-            <select id="v106-blocking-role-select" class="px-2 py-1.5 text-xs rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-100 disabled:opacity-50" title="Affiner par rôle bloquant précis" disabled>
-                <option value="">Tous les rôles bloquants</option>
+            <select id="v106-blocking-role-select" class="px-2 py-1.5 text-xs rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-100 disabled:opacity-50" title="Affiner par rôle ou entreprise bloquante" disabled>
+                <option value="">Tous les rôles / entreprises bloquants</option>
             </select>`;
         toolbar.insertBefore(wrap, exportBtn);
         document.getElementById('v106-filter-overdue').addEventListener('click', function(){ window.__v106FilterOverdue = !window.__v106FilterOverdue; updateButtons(); if (typeof window.applyFilters === 'function') window.applyFilters(); });
@@ -20335,7 +20573,9 @@
         rows.forEach(row=>{
             const current=commentsOf(row),raw=rawHistoryForRow(row);
             const sourceRounds=clean(raw.rounds)||roundsOf(row);
-            const sourceNotes=clean(raw.notes)||notesOf(row);
+            // Une revue identifiée peut légitimement n'avoir aucune note : ne
+            // jamais réintroduire une ancienne note de la même URN/ autre WF.
+            const sourceNotes=raw.reviewId?clean(raw.notes):notesOf(row);
             const resolved=safeResolver(sourceRounds,sourceNotes,current);
             row.extractedWfRoundsHistory=resolved.rounds||'';
             row.roundsHistory=resolved.rounds||'';
@@ -24261,7 +24501,7 @@ self.onmessage=async function(ev){
 
                 processedData.push({ 
                     ...row, extractedNom: nomComplet, extractedDesc: desc, extractedChemin: cheminComplet, extractedVersion: version,
-                    extractedAccFileStatusRaw: status, extractedStatus: statusAccFinal, extractedWorkflow: workflowStr, extractedComments: commentsStr, extractedWfRoundsHistory: v58HistResolved.rounds || '', extractedWfProgressNotes: v58HistResolved.notes || '', extractedPha: originalPha, extractedEmett: originalEmett, extractedSpe: originalSpe,
+                    extractedAccFileStatusRaw: status, extractedStatus: statusAccFinal, extractedWorkflow: workflowStr, extractedComments: commentsStr, extractedWfRoundsHistory: v58HistResolved.rounds || '', extractedWfProgressNotes: v58HistResolved.notes || '', extractedWfSilentSubmissions: (v57Hist && v57Hist.silentSubmissions) || '', extractedPha: originalPha, extractedEmett: originalEmett, extractedSpe: originalSpe,
                     extractedNiv: originalNiv, extractedTyp: originalTyp, extractedInd: originalInd, baseName, exactName, format, conformity: conf, dossierType, 
                     isApproved: status.toLowerCase().includes('approuv') || status.toLowerCase().includes('approved') || status.toLowerCase().includes('visa a') || status.toLowerCase().includes('visa b'), 
                     isDuplicated, lot, isOldFolder, isCommentFolder,
@@ -24474,7 +24714,7 @@ self.onmessage=async function(ev){
     for(var i=0;i<total;i++){
       if(token!==annotateToken)return;
       var r=rows[i];if(isDocumentRow(r)){r.isApproved=isRevisionApproved(r);r.__v166RevisionStatus=revisionStatus(r);r.__v166Naming=namingState(r);}
-      if((i+1)%250===0||i===total-1){if(progressFn)progressFn(72+Math.round(((i+1)/Math.max(1,total))*12),`Contrôle des indicateurs : ${(i+1).toLocaleString('fr-FR')} / ${total.toLocaleString('fr-FR')}…`);await sleep(0);}
+      if((i+1)%250===0||i===total-1){if(progressFn)progressFn(80+Math.round(((i+1)/Math.max(1,total))*6),`Contrôle des indicateurs : ${(i+1).toLocaleString('fr-FR')} / ${total.toLocaleString('fr-FR')}…`);await sleep(0);}
     }
     if(token===annotateToken){lastAnnotatedRows=rows;lastAnnotatedLen=rows.length;lastAnnotatedRef=refSig;}
   }
@@ -24506,7 +24746,7 @@ self.onmessage=async function(ev){
       var current='';try{current=activeQuickFilterType||'';}catch(e){current=window.activeQuickFilterType||'';}
       if(current===type){window.__v166NamingScope='';return priorQuick.call(this,type);}
       window.__v166NamingScope=type;try{activeQuickFilterType=type;}catch(e){}window.activeQuickFilterType=type;
-      ['flt-conformite','flt-approbation','flt-duplique','flt-wfname','flt-lot','flt-dossier','flt-format','flt-pha','flt-emett','flt-spe','flt-niv','flt-typ1','flt-typ2','flt-ind','flt-ver','flt-statut','flt-search','flt-archive-state'].forEach(function(id){try{if(typeof clearFilterElement==='function')clearFilterElement(id);}catch(e){}});
+      ['flt-conformite','flt-approbation','flt-duplique','flt-wfglobal','flt-wfname','flt-lot','flt-dossier','flt-format','flt-pha','flt-emett','flt-spe','flt-niv','flt-typ1','flt-typ2','flt-ind','flt-ver','flt-statut','flt-search','flt-archive-state'].forEach(function(id){try{if(typeof clearFilterElement==='function')clearFilterElement(id);}catch(e){}});
       try{currentPathFilter='';}catch(e){}window.currentPathFilter='';if(typeof applyFilters==='function')applyFilters();try{if(typeof updateKPIStyles==='function')updateKPIStyles();if(typeof switchTab==='function')switchTab('bdd');}catch(e){}
     };
     wrappedQuick.__v166Wrapped=true;window.applyQuickFilter=wrappedQuick;try{applyQuickFilter=wrappedQuick;}catch(e){}
@@ -24524,7 +24764,30 @@ self.onmessage=async function(ev){
       progress(3,'Préparation des données importées…');await frame();
       progress(9,'Préparation de l’index des workflows…');await frame();if(typeof window.buildWorkflowIndexFast==='function')window.buildWorkflowIndexFast();
       progress(16,'Démarrage de l’analyse documentaire…');await frame();await v166AnalyzeDataAsync(progress);
-      progress(70,'Vérification des correspondances workflows…');await frame();try{if(typeof window.v112SanitizeWorkflowRows==='function')window.v112SanitizeWorkflowRows(true);}catch(e){console.warn('[V166] WF V112',e);}try{if(typeof window.v108CleanAndRepairWorkflowRows==='function')window.v108CleanAndRepairWorkflowRows(false);}catch(e){console.warn('[V166] WF V108',e);}
+      progress(70,'Consolidation des correspondances workflows…');await frame();
+      // V224-PERF : le mapper V112 est déjà utilisé pendant v166AnalyzeDataAsync via
+      // getWorkflowForDocumentRobust. Refaire ensuite V112 + V108 sur toutes les lignes
+      // doublait le contrôle exact fichier/WF sans modifier le résultat.
+      // Repli conservé uniquement si le moteur strict V112 n'est pas installé.
+      if(!window.__v112StrictFileWfInstalled){
+        try{if(typeof window.v112SanitizeWorkflowRows==='function')window.v112SanitizeWorkflowRows(true);}catch(e){console.warn('[V224-PERF] WF V112',e);}
+        try{if(typeof window.v108CleanAndRepairWorkflowRows==='function')window.v108CleanAndRepairWorkflowRows(false);}catch(e){console.warn('[V224-PERF] WF V108',e);}
+      }
+      progress(72,'Collecte des soumissions sans commentaires…');await frame();
+      // V224-PERF-RED : V212 reste la source exhaustive des événements silencieux.
+      // On exécute uniquement sa fonction d'origine (sans wrapper V215) une seule fois.
+      try{
+        const silentFn=window.v212RefreshSilentSubmissions;
+        const silentBase=(silentFn&&silentFn.__v215Original)||silentFn;
+        if(typeof silentBase==='function')silentBase.call(window,false);
+      }catch(e){console.warn('[V224-PERF-RED] Traçabilité soumissions silencieuses',e);}
+      progress(76,'Calcul strict des rôles et contributions…');await frame();
+      // V215 affine ensuite le calcul métier et fusionne ses explications avec V212.
+      try{if(typeof window.v215RefreshStrictRoleActivity==='function')window.v215RefreshStrictRoleActivity(false);
+          else if(typeof window.v212RefreshSilentSubmissions==='function')window.v212RefreshSilentSubmissions(false);}
+      catch(e){console.warn('[V224-PERF-RED] Contributions strictes',e);}
+      try{if(typeof window.v224RefreshMandatoryVsOptional==='function')window.v224RefreshMandatoryVsOptional(false);}catch(e){console.warn('[V224-PERF-RED] Obligatoires/facultatifs',e);}
+      progress(79,'Correspondances, rôles et explications consolidés.');await frame();
       await ensureAnnotatedAsync(allRows(),progress);await refreshCardsAsync(true);
       progress(88,'Mise à jour du référentiel et des indicateurs…');await frame();try{if(typeof updateGlossaryDynamicList==='function')updateGlossaryDynamicList();}catch(e){console.warn('[V166] Glossaire',e);}
       progress(95,'Affichage du dashboard…');await frame();forceVisible();await frame();
@@ -24561,13 +24824,13 @@ self.onmessage=async function(ev){
   /* V207: ancien marqueur de version supprimé (V167) */
 
   const MULTI_IDS = [
-    'flt-conformite','flt-approbation','flt-duplique','flt-wfname','flt-lot','flt-dossier','flt-format',
+    'flt-conformite','flt-approbation','flt-duplique','flt-wfglobal','flt-wfname','flt-lot','flt-dossier','flt-format',
     'flt-pha','flt-emett','flt-spe','flt-niv','flt-typ1','flt-typ2','flt-ind','flt-ver','flt-statut'
   ];
   const ALL_IDS = ['flt-archive-state'].concat(MULTI_IDS, ['flt-search']);
   const LABELS = {
     'flt-archive-state':'État dossier','flt-conformite':'Conformité','flt-approbation':'Approbation',
-    'flt-statut':'Statut fichier ACC','flt-wfname':'Nom WF','flt-lot':'Lot','flt-dossier':'Type dossier',
+    'flt-statut':'Statut fichier ACC','flt-wfglobal':'Statut global WF','flt-wfname':'Nom WF','flt-lot':'Lot','flt-dossier':'Type dossier',
     'flt-format':'Format','flt-ver':'Version','flt-duplique':'Duplication','flt-pha':'Phase',
     'flt-emett':'Émetteur','flt-spe':'Spécialité','flt-niv':'Niveau','flt-typ1':'Type 1',
     'flt-typ2':'Type 2','flt-ind':'Indice','flt-search':'Recherche'
@@ -24634,7 +24897,7 @@ self.onmessage=async function(ev){
       row && row['Folder Path'],row && row['File Path'],row && row['Path'],row && row['Folder'],row && row['Location']
     ));
   }
-  function wfGlobal(row){ const wf=row&&row.wfData?row.wfData:{}; return clean(first(row&&row.extractedWfGlobalStatus,wf.globStat,'Aucun workflow lancé')); }
+  function wfGlobal(row){ return typeof window.canonicalWorkflowStatus==='function' ? window.canonicalWorkflowStatus(row) : ''; }
   function hasWorkflow(row){
     const wf=row&&row.wfData?row.wfData:{};
     const text=clean([row&&row.extractedWorkflow,row&&row.extractedWfName,row&&row.extractedWfGlobalStatus,row&&row.extractedCurrentStep,wf.id,wf.wfName,wf.globStat].filter(Boolean).join(' '));
@@ -24710,7 +24973,7 @@ self.onmessage=async function(ev){
     return {
       archive:selectedValues('flt-archive-state')[0]||'',
       conformity:selectedSet('flt-conformite'), approval:selectedSet('flt-approbation'), duplicate:selectedSet('flt-duplique'),
-      wfName:selectedSet('flt-wfname'), lot:selectedSet('flt-lot'), dossier:selectedSet('flt-dossier'), format:selectedSet('flt-format'),
+      wfGlobal:selectedSet('flt-wfglobal'), wfName:selectedSet('flt-wfname'), lot:selectedSet('flt-lot'), dossier:selectedSet('flt-dossier'), format:selectedSet('flt-format'),
       pha:selectedSet('flt-pha'), emett:selectedSet('flt-emett'), spe:selectedSet('flt-spe'), niv:selectedSet('flt-niv'),
       typ1:selectedSet('flt-typ1'), typ2:selectedSet('flt-typ2'), ind:selectedSet('flt-ind'), ver:selectedSet('flt-ver'),
       status:selectedSet('flt-statut'),
@@ -24778,7 +25041,7 @@ self.onmessage=async function(ev){
     if(state.archive==='NoComments'&&x.commentFolder) return false;
     if(state.archive==='ActuelsNoComments'&&(x.archiveOld||x.commentFolder)) return false;
     if(!matchSet(state.conformity,x.conformity)||!matchSet(state.approval,x.approval)||!matchSet(state.duplicate,x.duplicate)) return false;
-    if(!matchSet(state.wfName,x.wfName)||!matchSet(state.lot,x.lot)||!matchSet(state.dossier,x.dossier)||!matchSet(state.format,x.format)) return false;
+    if(!matchSet(state.wfGlobal,wfGlobal(row))||!matchSet(state.wfName,x.wfName)||!matchSet(state.lot,x.lot)||!matchSet(state.dossier,x.dossier)||!matchSet(state.format,x.format)) return false;
     if(!matchSet(state.pha,x.pha)||!matchSet(state.emett,x.emett)||!matchSet(state.spe,x.spe)||!matchSet(state.niv,x.niv)) return false;
     if(!matchSet(state.typ1,x.typ1)||!matchSet(state.typ2,x.typ2)||!matchSet(state.ind,x.ind)||!matchSet(state.ver,x.ver)||!matchSet(state.status,x.status)) return false;
     if(state.path&&!x.pathLower.includes(state.path)) return false;
@@ -25244,7 +25507,7 @@ self.onmessage=async function(ev){
   window.__v171CardScope='';
   function updateActiveCards(){document.querySelectorAll('#v171-kpi-grid .v171-card').forEach(c=>{const active=window.__v171CardScope===c.dataset.scope;c.classList.toggle('active',active);c.classList.toggle('inactive',!!window.__v171CardScope&&!active);});}
   function clearUiFilters(){
-    const ids=['flt-conformite','flt-approbation','flt-duplique','flt-wfname','flt-lot','flt-dossier','flt-format','flt-pha','flt-emett','flt-spe','flt-niv','flt-typ1','flt-typ2','flt-ind','flt-ver','flt-statut','flt-search','flt-archive-state'];
+    const ids=['flt-conformite','flt-approbation','flt-duplique','flt-wfglobal','flt-wfname','flt-lot','flt-dossier','flt-format','flt-pha','flt-emett','flt-spe','flt-niv','flt-typ1','flt-typ2','flt-ind','flt-ver','flt-statut','flt-search','flt-archive-state'];
     ids.forEach(id=>{try{if(typeof clearFilterElement==='function')clearFilterElement(id);}catch(e){}});try{currentPathFilter='';}catch(e){}
   }
   function applyCardScope(key){
@@ -25432,24 +25695,48 @@ self.onmessage=async function(ev){
     let lastRepairSignature = '';
 
     const CONFIRMED = new Map([
+        ['SVN234NJPPQQUR9U', 'Anna Mugele'],
+        ['63N2JW79QEM6CEKA', 'Christophe DAUDIGNY'],
         ['LSD22DBGKTUB5H2X', 'Dorian Depaulis'],
         ['D872MJLNJ6P5TQ66', 'Michael TORNABONI'],
         ['NK92KJTQQDBMB3CP', 'secretariat oa'],
-        ['3ZG9KKPLR38C', 'Jean-Philippe Lemaire'],
-        ['2BLJ9C82LMHT2D7X', 'Maryne Fosse'],
-        ['8EZ2KFBMKZWFB2SG', 'Thimité Dumas'],
+        ['3ZG9KKPLR38C', 'Sebastien Declaye'],
+        ['2BLJ9C82LMHT2D7X', 'Maryne FOSSE'],
+        ['8EZ2KFBMKZWFB2SG', 'thimothé dumas'],
         ['9ZD2JQLXQYATAZM8', 'Jérémy Payet'],
-        ['32Y2GTQPQ85Y42EC', 'Deirdre Philips'],
+        ['32Y2GTQPQ85Y42EC', 'Deirdre Phillips'],
+        ['CWWJ4DW8MCDSQASK', 'Letizia Pezzini'],
+        ['997AJBUADBQW', 'Corentin Gilleman'],
+        ['3Y9J7SJDRATHAQAM', 'Arthur Gouvet'],
+        ['3H22QPCURSSYU6GV', 'Jean-Pascal Bourdouxhe'],
+        ['HMLANPAXWKFK', 'Jean-Philippe Lemaire'],
         ['EBYXKDWNBW82', 'Jarod NAU'],
         ['FKA2MH49JVMDJYCQ', 'Astrid DEBAYLE'],
         ['FLMNL3U4ULKP', 'Jean-Michel Frenay'],
         ['G742FEUQM5ZHKRV7', 'Albane Lacroix'],
         ['GYK2R39CPKA9EZGF', 'Nancy Lepine'],
         ['QZTJ9FUTLJUWB3DT', 'LOT GO CLE-CBL (retiré)'],
-        ['R8F2KYBSQS3Y58AU', 'Jean-Pascal Bourdouxhe'],
+        ['R8F2KYBSQS3Y58AU', 'Adriano Candura'],
         ['UJ224U6JR2MKNZFV', 'Sebastian Sieg'],
         ['URSJ5SDBJPL3PGRM', 'Artur Michalak']
-    ]);
+    
+        ['P9A2RD5FJDZJKWBA', 'Francois RODRIGUEZ'],
+        ['A26282SGMLMHN6N2', 'Marc GONZALEZ'],
+        ['EY3FNXGP3NM5', 'Claude Ballini'],
+        ['DMX2TEXFKY86ZF2S', 'Ana Fernandez'],
+        ['JZS26V9LMYFN7DZ4', 'Benoit TAHCHI'],
+        ['HZC2VMPUK2TUC9L4', 'Jonathan D HONDT'],
+        ['CEAJJLV8MKGLB22T', 'Didier Tassenoey'],
+        ['2Z9LP7UNRL4Q', 'Pascal DEPRELLE'],
+        ['LMAHKB7C336R', 'Cedric Liegeois'],
+        ['K852R26ZMKE53B39', 'b pardinho'],
+        ['CZCRPGM47KT5', 'tsi tsi'],
+        ['FXYJS67CPRS9ZEQL', 'Thorsten Tamble'],
+        ['GC2SQA9H2XRP', 'André Philippe'],
+        ['WFXWLFB4KTGV', 'Françoise Petit'],
+        ['PBAYQZ69NCBZ', 'guillaume PIERROT'],
+        ['ZUG2SC9CLKML7JSB', 'JEAN PIERRE JACQUES'],
+        ['ZMV2BVEJRC4EFDZT', 'Jerome PONCELET'],]);
 
     function clean(v){ return String(v == null ? '' : v).replace(/\r\n?/g, '\n').trim(); }
     function codeKey(v){ return clean(v).toUpperCase(); }
@@ -25674,7 +25961,8 @@ self.onmessage=async function(ev){
             captureMembers();
             const visited = new WeakSet();
             allObjectsForExplicitPairs().forEach(obj => scanExplicitPairs(obj,0,visited));
-            if (includeGlobal !== false) inferGlobalExactPairs();
+            // Une phrase identique entre deux WFs ne suffit pas à identifier un auteur.
+            // Les paires explicites importées et correspondances contrôlées priment.
             syncLegacyAndState();
             window.__v185AuthorAliasMap = aliases;
             return aliases;
@@ -26207,24 +26495,47 @@ self.onmessage=async function(ev){
   /* V207: ancien marqueur de version supprimé (V202) */
 
   const CONFIRMED_BASE={
+    'SVN234NJPPQQUR9U':'Anna Mugele',
+    '63N2JW79QEM6CEKA':'Christophe DAUDIGNY',
     'LSD22DBGKTUB5H2X':'Dorian Depaulis',
     'D872MJLNJ6P5TQ66':'Michael TORNABONI',
     'NK92KJTQQDBMB3CP':'secretariat oa',
-    '3ZG9KKPLR38C':'Jean-Philippe Lemaire',
-    '2BLJ9C82LMHT2D7X':'Maryne Fosse',
-    '8EZ2KFBMKZWFB2SG':'Thimité Dumas',
+    '3ZG9KKPLR38C':'Sebastien Declaye',
+    '2BLJ9C82LMHT2D7X':'Maryne FOSSE',
+    '8EZ2KFBMKZWFB2SG':'thimothé dumas',
     '9ZD2JQLXQYATAZM8':'Jérémy Payet',
-    '32Y2GTQPQ85Y42EC':'Deirdre Philips',
+    '32Y2GTQPQ85Y42EC':'Deirdre Phillips',
+    'CWWJ4DW8MCDSQASK':'Letizia Pezzini',
+    '997AJBUADBQW':'Corentin Gilleman',
+    '3Y9J7SJDRATHAQAM':'Arthur Gouvet',
+    '3H22QPCURSSYU6GV':'Jean-Pascal Bourdouxhe',
+    'HMLANPAXWKFK':'Jean-Philippe Lemaire',
     'EBYXKDWNBW82':'Jarod NAU',
     'FKA2MH49JVMDJYCQ':'Astrid DEBAYLE',
     'FLMNL3U4ULKP':'Jean-Michel Frenay',
     'G742FEUQM5ZHKRV7':'Albane Lacroix',
     'GYK2R39CPKA9EZGF':'Nancy Lepine',
     'QZTJ9FUTLJUWB3DT':'LOT GO CLE-CBL (retiré)',
-    'R8F2KYBSQS3Y58AU':'Jean-Pascal Bourdouxhe',
+    'R8F2KYBSQS3Y58AU':'Adriano Candura',
     'UJ224U6JR2MKNZFV':'Sebastian Sieg',
-    'URSJ5SDBJPL3PGRM':'Artur Michalak'
-  };
+    'URSJ5SDBJPL3PGRM':'Artur Michalak',
+    'P9A2RD5FJDZJKWBA':'Francois RODRIGUEZ',
+    'A26282SGMLMHN6N2':'Marc GONZALEZ',
+    'EY3FNXGP3NM5':'Claude Ballini',
+    'DMX2TEXFKY86ZF2S':'Ana Fernandez',
+    'JZS26V9LMYFN7DZ4':'Benoit TAHCHI',
+    'HZC2VMPUK2TUC9L4':'Jonathan D HONDT',
+    'CEAJJLV8MKGLB22T':'Didier Tassenoey',
+    '2Z9LP7UNRL4Q':'Pascal DEPRELLE',
+    'LMAHKB7C336R':'Cedric Liegeois',
+    'K852R26ZMKE53B39':'b pardinho',
+    'CZCRPGM47KT5':'tsi tsi',
+    'FXYJS67CPRS9ZEQL':'Thorsten Tamble',
+    'GC2SQA9H2XRP':'André Philippe',
+    'WFXWLFB4KTGV':'Françoise Petit',
+    'PBAYQZ69NCBZ':'guillaume PIERROT',
+    'ZUG2SC9CLKML7JSB':'JEAN PIERRE JACQUES',
+    'ZMV2BVEJRC4EFDZT':'Jerome PONCELET',};
   const manual=new Map();
   let modal=null;
   let lastUnresolved=[];
@@ -26606,7 +26917,7 @@ self.onmessage=async function(ev){
    V207 — Moteur final unique des exports Excel
    - Construction directe : page de garde + onglets métier EXE/Chantier.
    - Aucun audit WF ni reconstruction successive des feuilles.
-   - 22 colonnes finales construites une seule fois.
+   - 23 colonnes finales construites une seule fois.
    - Styles limités aux zones utiles, liens et échéances.
    - Génération XLSX dans un Worker dédié sans compression.
    ========================================================== */
@@ -26621,15 +26932,16 @@ self.onmessage=async function(ev){
         'Nom du fichier','Indice','Version ACC','Format','Lot','Description',
         'Statut Révision (Fichier)','Commentaires du dernier round',
         'Historique des commentaires du fichier en fonction de différents rounds',
-        'Notes progression WF','Lien Fichier','ID','Statut ACC','Statut Global (WFs)',
+        'Notes progression WF','Soumissions sans commentaire','Lien Fichier','ID','Statut ACC','Statut Global (WFs)',
         'Étape actuelle','Nom WF correspondant','Rôles Obligatoires','Rôles Bloquants',
         'Approbateur Final','Date de création (WFs)','Échéance (Due le)','Date Clôture'
     ];
-    const WIDTHS=[54,10,12,10,18,58,24,72,80,70,28,12,20,24,22,45,26,26,22,20,20,20];
+    const WIDTHS=[54,10,12,10,18,58,24,72,80,70,58,28,12,20,24,22,45,26,26,22,20,20,20];
     const collator=new Intl.Collator('fr',{numeric:true,sensitivity:'base'});
     const NORMAL_WRAP={font:{name:'Calibri',sz:10},alignment:{vertical:'top',wrapText:true}};
     const LINK_STYLE={font:{name:'Calibri',sz:10,color:{rgb:'0563C1'},underline:true},alignment:{vertical:'top',wrapText:true}};
     const OVERDUE_STYLE={font:{name:'Calibri',sz:10,color:{rgb:'9C0006'},bold:true},fill:{patternType:'solid',fgColor:{rgb:'FFC7CE'}},alignment:{vertical:'top',wrapText:true}};
+    const SILENT_SUBMISSION_STYLE={font:{name:'Calibri',sz:10,color:{rgb:'9C0006'},bold:true},fill:{patternType:'solid',fgColor:{rgb:'FCE4D6'}},alignment:{vertical:'top',wrapText:true},numFmt:'@',quotePrefix:true};
     const HEADER_STYLE={font:{name:'Calibri',sz:10,bold:true,color:{rgb:'000000'}},fill:{patternType:'solid',fgColor:{rgb:'DDEBF7'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{bottom:{style:'medium',color:{rgb:'8EA9DB'}}}};
     const FORMULA_TEXT_GUARD='\u2060'; // caractère invisible : empêche Excel de convertir le texte en formule après édition
     const TITLE_STYLE={font:{name:'Calibri',sz:16,bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'000000'}},alignment:{vertical:'center',wrapText:true}};
@@ -26732,7 +27044,7 @@ self.onmessage=async function(ev){
         let m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);if(m){let y=Number(m[3]);if(y<100)y+=2000;const d=new Date(y,Number(m[2])-1,Number(m[1]));return isNaN(d)?null:d;}
         const d=new Date(s);return isNaN(d)?null:d;
     }
-    function overdue(values){const d=parseDate(values[20]);if(!d)return false;const today=new Date();today.setHours(0,0,0,0);d.setHours(0,0,0,0);if(d>=today)return false;const close=clean(values[21]),status=norm([values[12],values[13]].join(' '));if(close&&close!=='--'&&close!=='-')return false;return !/approuve|approved|ferme|closed|cloture|archive|caduc|invalide|annule|termine/.test(status);}
+    function overdue(values){const d=parseDate(values[21]);if(!d)return false;const today=new Date();today.setHours(0,0,0,0);d.setHours(0,0,0,0);if(d>=today)return false;const close=clean(values[22]),status=norm([values[13],values[14]].join(' '));if(close&&close!=='--'&&close!=='-')return false;return !/approuve|approved|ferme|closed|cloture|archive|caduc|invalide|annule|termine/.test(status);}
 
     /* V150 — restauration légère des couleurs historiques par statut.
        Aucun balayage global supplémentaire : les trois cellules de statut sont
@@ -26761,7 +27073,7 @@ self.onmessage=async function(ev){
         };
     }
     function safeSheetName(value){return String(value||'Liste des documents').replace(/[\\/\?\*\[\]:]/g,' ').slice(0,31).trim()||'Liste des documents';}
-    function maxTextLines(values){let n=1;[5,7,8,9,15,16,17].forEach(i=>{const s=clean(values[i]);if(!s)return;const lines=s.split('\n').length+Math.floor(s.length/110);n=Math.max(n,Math.min(lines,5));});return n;}
+    function maxTextLines(values){let n=1;[5,7,8,9,10,16,17,18].forEach(i=>{const s=clean(values[i]);if(!s)return;const lines=s.split('\n').length+Math.floor(s.length/110);n=Math.max(n,Math.min(lines,5));});return n;}
 
     /* V178 — protection durable des textes longs contre les formules Excel.
        Le caractère WORD JOINER (U+2060) est invisible, mais reste le premier
@@ -26784,6 +27096,7 @@ self.onmessage=async function(ev){
         protectCommentTextCell(cell(ws,rowIndex,7,false));  // Commentaires du dernier round
         protectCommentTextCell(cell(ws,rowIndex,8,false));  // Historique des rounds
         protectCommentTextCell(cell(ws,rowIndex,9,false));  // Notes progression WF
+        protectCommentTextCell(cell(ws,rowIndex,10,false)); // Soumissions sans commentaire
     }
     function applyFileHyperlink(ws,rowIndex,target){
         const url=clean(target);if(!url)return;
@@ -26805,7 +27118,7 @@ self.onmessage=async function(ev){
             const directFileUrl=clean(tpl&&(tpl.fileNameUrl||tpl.fileUrl));
             const fileUrl=clean(tpl&&(tpl.fileNameUrl||tpl.fileUrl||tpl.locationUrl));
             const wfUrl=clean(tpl&&tpl.workflowUrl);
-            if(fileUrl)values[10]='Lien Data Management';
+            if(fileUrl)values[11]='Lien Data Management';
             aoa.push(values);metas.push({fileUrl,nameUrl:directFileUrl||fileUrl,wfUrl,overdue:overdue(values),lines:maxTextLines(values)});
             if((i+1)%chunk===0||i===rows.length-1){progress(`Préparation de la liste documentaire : ${(i+1).toLocaleString('fr-FR')} / ${rows.length.toLocaleString('fr-FR')}…`,12+Math.round(((i+1)/total)*48));await frame();}
         }
@@ -26816,17 +27129,18 @@ self.onmessage=async function(ev){
         ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:3,c:0},e:{r:Math.max(3,aoa.length-1),c:HEADERS.length-1}})};
         ws['!freeze']={xSplit:0,ySplit:4,topLeftCell:'A5',activePane:'bottomLeft',state:'frozen'};ws['!views']=[{state:'frozen',ySplit:4,topLeftCell:'A5',activePane:'bottomLeft'}];ws['!v64FreezeRows']=4;
         styleRow(ws,0,TITLE_STYLE);styleRow(ws,1,SUBTITLE_STYLE);styleRow(ws,3,HEADER_STYLE);
-        const wrapCols=[5,7,8,9,15,16,17];
+        const wrapCols=[5,7,8,9,10,16,17,18];
         for(let i=0;i<metas.length;i++){
             const r=i+4,m=metas[i];wrapCols.forEach(c=>{const ce=cell(ws,r,c,false);if(ce)ce.s=NORMAL_WRAP;});
             protectLongTextColumns(ws,r);
             applyFileHyperlink(ws,r,m.nameUrl||m.fileUrl);
-            if(m.fileUrl){const ce=cell(ws,r,10,true);ce.t='s';ce.v='Lien Data Management';ce.l={Target:m.fileUrl,Tooltip:'Ouvrir directement le fichier dans Autodesk Forma - Data Management'};ce.s=LINK_STYLE;}
-            if(m.wfUrl){const ce=cell(ws,r,11,false);if(ce&&clean(ce.v)){ce.l={Target:m.wfUrl,Tooltip:'Ouvrir le workflow dans Autodesk Forma - Data Management'};ce.s=LINK_STYLE;}}
+            if(m.fileUrl){const ce=cell(ws,r,11,true);ce.t='s';ce.v='Lien Data Management';ce.l={Target:m.fileUrl,Tooltip:'Ouvrir directement le fichier dans Autodesk Forma - Data Management'};ce.s=LINK_STYLE;}
+            if(m.wfUrl){const ce=cell(ws,r,12,false);if(ce&&clean(ce.v)){ce.l={Target:m.wfUrl,Tooltip:'Ouvrir le workflow dans Autodesk Forma - Data Management'};ce.s=LINK_STYLE;}}
             applyStatusStyle(ws,r,6,'file');
-            applyStatusStyle(ws,r,12,'file');
-            applyStatusStyle(ws,r,13,'wf');
-            if(m.overdue){const ce=cell(ws,r,20,false);if(ce)ce.s=OVERDUE_STYLE;}
+            applyStatusStyle(ws,r,13,'file');
+            applyStatusStyle(ws,r,14,'wf');
+            const silentCell=cell(ws,r,10,false);if(silentCell&&clean(silentCell.v)){silentCell.s=SILENT_SUBMISSION_STYLE;}
+            if(m.overdue){const ce=cell(ws,r,21,false);if(ce)ce.s=OVERDUE_STYLE;}
             if(m.lines>1)ws['!rows'][r]={hpt:Math.min(78,18+m.lines*12)};
             if((i+1)%700===0){progress(`Application des liens et contrôles : ${(i+1).toLocaleString('fr-FR')} / ${metas.length.toLocaleString('fr-FR')}…`,65+Math.round(((i+1)/Math.max(1,metas.length))*12));await frame();}
         }
@@ -26950,7 +27264,7 @@ self.onmessage=async function(ev){
                 const tpl=entry.file.tpl||{};
                 const directFileUrl=clean(tpl.fileNameUrl||tpl.fileUrl);
                 const fileUrl=clean(tpl.fileNameUrl||tpl.fileUrl||tpl.locationUrl),wfUrl=clean(tpl.workflowUrl);
-                if(fileUrl)values[10]='Lien Data Management';
+                if(fileUrl)values[11]='Lien Data Management';
                 aoa.push(values);metas.push({type:'file',level:entry.level,fileUrl,nameUrl:directFileUrl||fileUrl,wfUrl,overdue:overdue(values),lines:maxTextLines(values)});
             }
             if((i+1)%chunk===0||i===entries.length-1){progress(`Écriture de l’arborescence : ${(i+1).toLocaleString('fr-FR')} / ${entries.length.toLocaleString('fr-FR')} lignes…`,45+Math.round(((i+1)/Math.max(1,entries.length))*20));await frame();}
@@ -26962,7 +27276,7 @@ self.onmessage=async function(ev){
         ws['!freeze']={xSplit:0,ySplit:4,topLeftCell:'A5',activePane:'bottomLeft',state:'frozen'};ws['!views']=[{state:'frozen',ySplit:4,topLeftCell:'A5',activePane:'bottomLeft'}];ws['!v64FreezeRows']=4;
         ws['!outline']={above:true,left:false};ws['!tabColor']={rgb:'00B0F0'};
         styleRow(ws,0,TITLE_STYLE);styleRow(ws,1,SUBTITLE_STYLE);styleRow(ws,3,HEADER_STYLE);
-        const wrapCols=[5,7,8,9,15,16,17];
+        const wrapCols=[5,7,8,9,10,16,17,18];
         for(let i=0;i<metas.length;i++){
             const r=i+4,m=metas[i];
             if(m.type==='folder'){
@@ -26973,12 +27287,13 @@ self.onmessage=async function(ev){
                 wrapCols.forEach(c=>{const ce=cell(ws,r,c,false);if(ce)ce.s=NORMAL_WRAP;});
                 protectLongTextColumns(ws,r);
                 applyFileHyperlink(ws,r,m.nameUrl||m.fileUrl);
-                if(m.fileUrl){const ce=cell(ws,r,10,true);ce.t='s';ce.v='Lien Data Management';ce.l={Target:m.fileUrl,Tooltip:'Ouvrir directement le fichier dans Autodesk Forma - Data Management'};ce.s=LINK_STYLE;}
-                if(m.wfUrl){const ce=cell(ws,r,11,false);if(ce&&clean(ce.v)){ce.l={Target:m.wfUrl,Tooltip:'Ouvrir le workflow dans Autodesk Forma - Data Management'};ce.s=LINK_STYLE;}}
+                if(m.fileUrl){const ce=cell(ws,r,11,true);ce.t='s';ce.v='Lien Data Management';ce.l={Target:m.fileUrl,Tooltip:'Ouvrir directement le fichier dans Autodesk Forma - Data Management'};ce.s=LINK_STYLE;}
+                if(m.wfUrl){const ce=cell(ws,r,12,false);if(ce&&clean(ce.v)){ce.l={Target:m.wfUrl,Tooltip:'Ouvrir le workflow dans Autodesk Forma - Data Management'};ce.s=LINK_STYLE;}}
                 applyStatusStyle(ws,r,6,'file');
-                applyStatusStyle(ws,r,12,'file');
-                applyStatusStyle(ws,r,13,'wf');
-                if(m.overdue){const ce=cell(ws,r,20,false);if(ce)ce.s=OVERDUE_STYLE;}
+                applyStatusStyle(ws,r,13,'file');
+                applyStatusStyle(ws,r,14,'wf');
+                const silentCell=cell(ws,r,10,false);if(silentCell&&clean(silentCell.v)){silentCell.s=SILENT_SUBMISSION_STYLE;}
+                if(m.overdue){const ce=cell(ws,r,21,false);if(ce)ce.s=OVERDUE_STYLE;}
             }
             if((i+1)%650===0||i===metas.length-1){progress(`Couleurs et groupements Excel : ${(i+1).toLocaleString('fr-FR')} / ${metas.length.toLocaleString('fr-FR')}…`,68+Math.round(((i+1)/Math.max(1,metas.length))*10));await frame();}
         }
@@ -27630,6 +27945,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
 
   window.isWorkflowAtFinalApprovalStep = isWorkflowAtFinalApprovalStep = function(wf){
     wf=wf||{};
+    if(typeof wf._v221CurrentStepIsFinal==='boolean')return wf._v221CurrentStepIsFinal;
     var main=norm(currentStepLabel(wf));
     // Priorité absolue au libellé de l'étape active situé avant la parenthèse.
     if(/(^| )(1|01)($| )/.test(main)||/(INITIAL REVIEW|REVUE INITIALE|ETAPE 1|STEP 1|PREMIERE REVUE)/.test(main))return false;
@@ -27710,9 +28026,9 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   },true);
 
   function ui(){
-    window.__CFL_IMMO_DASHBOARD_VERSION__='V211';
-    try{document.title='CFLImmo - Dashboard Documentaire - V211';}catch(e){}
-    document.documentElement.setAttribute('data-dashboard-version','V211');
+    window.__CFL_IMMO_DASHBOARD_VERSION__='V213';
+    try{document.title='CFLImmo - Dashboard Documentaire - V213';}catch(e){}
+    document.documentElement.setAttribute('data-dashboard-version','V213');
   }
   ui();
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){ui();setTimeout(function(){refreshExistingRows(true);},300);},{once:true});
@@ -27721,5 +28037,1190 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
 })();
 </script>
 
+<script id="v212-silent-submissions">
+/* ==========================================================
+   V212 — Soumissions ACC sans commentaire
+   - workflow_notes vide = événement de soumission, pas une note à afficher ;
+   - rapprochement strict auteur -> membre -> rôle requis ;
+   - candidates confirme les utilisateurs Reviewer / Approver ;
+   - une soumission certaine débloque le rôle, sans être confondue avec un commentaire ;
+   - colonne dédiée rouge dans le dashboard et les exports Excel.
+   ========================================================== */
+(function(){
+  'use strict';
+  if(window.__v212SilentSubmissionsInstalled)return;
+  window.__v212SilentSubmissionsInstalled=true;
+
+  function clean(v){return String(v==null?'':v).trim();}
+  function key(v){return clean(v).toUpperCase();}
+  function norm(v){
+    return clean(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[’']/g,' ').replace(/[^A-Za-z0-9@.]+/g,' ').replace(/\s+/g,' ').trim().toUpperCase();
+  }
+  function cell(row,names){
+    try{if(typeof v57Cell==='function')return v57Cell(row,names);}catch(e){}
+    const index={};Object.keys(row||{}).forEach(k=>index[norm(k).replace(/ /g,'_')]=row[k]);
+    for(const name of names||[]){const v=index[norm(name).replace(/ /g,'_')];if(v!==undefined&&v!==null&&clean(v)!=='')return clean(v);}
+    return '';
+  }
+  function reviewState(){
+    try{if(typeof v57EnsureReviewHistoryState==='function')return v57EnsureReviewHistoryState();}catch(e){}
+    return window.reviewHistoryState||null;
+  }
+  function ensureRaw(s){
+    if(!s)return null;if(!s.raw)s.raw={};
+    ['comments','documents','reviews','notes','candidates','steps','workflows','templates','tasks'].forEach(k=>{if(!Array.isArray(s.raw[k]))s.raw[k]=[];});
+    return s.raw;
+  }
+  function detectExtended(rows,fileName){
+    const sample=(rows||[]).find(r=>r&&typeof r==='object')||{};
+    const keys=Object.keys(sample).map(k=>norm(k).replace(/ /g,'_'));
+    const has=(...cols)=>cols.every(c=>keys.includes(norm(c).replace(/ /g,'_')));
+    const f=clean(fileName).toLowerCase();
+    if(f.includes('review_workflow_templates')||has('template_id','workflow_id','form_id'))return 'templates';
+    if(f.includes('review_candidates')||has('step_id','step_name','candidate_type','candidate_oxygen_id'))return 'candidates';
+    if(f.includes('review_steps')||has('workflow_id','step_id','step_display_name'))return 'steps';
+    if(f.includes('review_tasks')||has('task_id','task_key','assignee','state','step_id'))return 'tasks';
+    if((f.includes('review_workflows')&&!f.includes('workflow_notes')&&!f.includes('workflow_templates'))||has('workflow_id','workflow_template_id','workflow_name'))return 'workflows';
+    return '';
+  }
+
+  function resolveAuthor(id){
+    const raw=clean(id);if(!raw)return 'Utilisateur ACC';
+    try{const v=window.v185ResolveAuthor&&window.v185ResolveAuthor(raw);if(clean(v)&&key(v)!==key(raw))return clean(v);}catch(e){}
+    try{const v=window.v191ResolveMemberId&&window.v191ResolveMemberId(raw);if(clean(v))return clean(v);}catch(e){}
+    const s=reviewState();try{const v=s&&s.usersById&&s.usersById.get(raw);if(clean(v))return clean(v);}catch(e){}
+    return raw;
+  }
+  function memberIds(m){return [m&&m.userId,m&&m.user_id,m&&m.autodeskId,m&&m.autodesk_user_id,m&&m.oxygenId,m&&m.oxygen_id,m&&m.id].map(key).filter(Boolean);}
+  function findMember(authorId,authorName){
+    const members=Array.isArray(window.membersDirectory)?window.membersDirectory:[];
+    const idKey=key(authorId),nameKey=norm(authorName);
+    let hit=idKey?members.find(m=>memberIds(m).includes(idKey)):null;
+    if(hit)return hit;
+    hit=members.find(m=>{
+      const mn=norm(m&&m.name),me=norm(m&&m.email);
+      return !!(nameKey&&((mn&&mn===nameKey)||(me&&me===nameKey)));
+    });
+    return hit||null;
+  }
+  function uniqueRoles(values){
+    const out=[];(values||[]).forEach(v=>{let c='';try{c=normalizeRoleCode(v);}catch(e){c=key(v);}if(c&&!out.includes(c))out.push(c);});return out;
+  }
+  function requiredRoles(row,wf){
+    let req=[];
+    if(Array.isArray(wf&&wf.rolesReqList))req=req.concat(wf.rolesReqList);
+    if(Array.isArray(wf&&wf.rolesReqFromName))req=req.concat(wf.rolesReqFromName);
+    req=req.concat(clean(row&&row.extractedRolesReq).split(',').map(x=>x.trim()));
+    if(!req.filter(Boolean).length&&wf&&(wf.wfName||wf.name)){
+      try{const parsed=parseRolesFromWorkflowName(wf.wfName||wf.name||'');req=req.concat(parsed.requiredRoles||[]);}catch(e){}
+    }
+    return uniqueRoles(req);
+  }
+  function finalRole(row,wf){
+    try{return normalizeRoleCode((wf&&(wf.finalApprover||wf.finalApproverFromName||wf.apprCalculated||wf.appr))||(row&&row.extractedFinalApprover)||'');}catch(e){return key(row&&row.extractedFinalApprover);}
+  }
+  function rolesForMember(member,req){
+    if(!member||!req.length)return[];
+    try{return uniqueRoles(rolesForMemberAgainstRequired(member,req));}catch(e){return[];}
+  }
+  function candidateFlags(event){
+    const t=norm((event&&event.candidateSteps||[]).join(' '));
+    return {reviewer:/(REVIEWER|REVISEUR|REVISEUSE|REVIEW)/.test(t),approver:/(APPROVER|APPROBATEUR|APPROVAL)/.test(t)};
+  }
+  function eventRoles(event,row,wf){
+    const req=requiredRoles(row,wf),final=finalRole(row,wf);
+    const name=resolveAuthor(event.authorId),member=findMember(event.authorId,name),flags=candidateFlags(event);
+    let roles=rolesForMember(member,req);
+    // Un reviewer utilisateur explicite peut être relié au rôle quand le workflow
+    // ne comporte qu'un seul rôle de revue. Avec plusieurs rôles, aucune supposition.
+    if(!roles.length&&flags.reviewer&&req.length===1)roles=[req[0]];
+    // L'approbateur final n'est attribué que si candidates le désigne explicitement.
+    if(flags.approver&&final)roles.push(final);
+    roles=uniqueRoles(roles);
+    return {name,member,roles,flags,relevant:roles.length>0||flags.reviewer||flags.approver};
+  }
+  function formatSilent(events){
+    const byRound=new Map();
+    (events||[]).forEach(e=>{const r=clean(e.round)||'1';if(!byRound.has(r))byRound.set(r,[]);byRound.get(r).push(e);});
+    return Array.from(byRound.keys()).sort((a,b)=>(parseInt(a,10)||0)-(parseInt(b,10)||0)).map(round=>{
+      const lines=byRound.get(round).sort((a,b)=>clean(a.createdAt).localeCompare(clean(b.createdAt))).map(e=>{
+        let date='';try{date=typeof v57FormatDate==='function'?v57FormatDate(e.createdAt||e.updatedAt||''):clean(e.createdAt||e.updatedAt);}catch(err){date=clean(e.createdAt||e.updatedAt);}
+        const company=e.member?clean(e.member.companyShort||e.member.company):'';
+        const roleLabel=e.roles.length?e.roles.join(', '):'rôle à identifier';
+        const attribution=[roleLabel,company].filter(Boolean).join(' / ');
+        const observation=e.displayKind==='progress-note'
+          ? 'Note de progression renseignée sans commentaire documentaire · rôle débloqué, pratique à améliorer'
+          : 'Soumis sans commentaire · rôle obligatoire débloqué par la soumission · commentaire textuel absent · pratique à améliorer';
+        return `- ${e.name}${date?' ('+date+')':''} — ${attribution} — ${observation}`;
+      });
+      return `ROUND ${round}\n${lines.join('\n')}`;
+    }).join('\n\n');
+  }
+
+  function buildSubmissionIndex(){
+    const s=reviewState(),raw=ensureRaw(s);if(!s||!raw)return;
+    const docToReview=new Map();
+    (raw.documents||[]).forEach(r=>{const id=cell(r,['id']),reviewId=cell(r,['review_id']);if(id&&reviewId)docToReview.set(id,reviewId);});
+
+    const commentKeys=new Set();
+    (raw.comments||[]).forEach(r=>{
+      if(cell(r,['deleted_at']))return;
+      const reviewId=docToReview.get(cell(r,['review_document_id']))||cell(r,['review_id']);
+      const author=cell(r,['created_by','author']),round=cell(r,['round_num'])||'1',text=cell(r,['text']);
+      if(reviewId&&author&&text)commentKeys.add(`${key(reviewId)}¦${key(round)}¦${key(author)}`);
+    });
+
+    const reviewInstance=new Map(),reviewSequence=new Map();
+    (raw.reviews||[]).forEach(r=>{
+      const reviewId=cell(r,['id']),instance=cell(r,['instance_id']),sequence=cell(r,['sequence_id']);
+      if(reviewId&&instance)reviewInstance.set(key(reviewId),key(instance));
+      if(reviewId&&sequence)reviewSequence.set(key(reviewId),key(sequence));
+    });
+    const candidateUsersByInstance=new Map();
+    const candidateUsersByReview=new Map();
+    (raw.candidates||[]).forEach(r=>{
+      if(norm(cell(r,['candidate_type']))!=='USER')return;
+      const reviewId=key(cell(r,['id','review_id'])),instance=key(cell(r,['instance_id'])),author=key(cell(r,['candidate_oxygen_id'])),step=cell(r,['step_name','step_display_name']);
+      if(!author)return;
+      if(instance){const k=`${instance}¦${author}`;if(!candidateUsersByInstance.has(k))candidateUsersByInstance.set(k,new Set());if(step)candidateUsersByInstance.get(k).add(step);}
+      // Dans l'export ACC candidates, la colonne id correspond directement au review_id.
+      if(reviewId){const k=`${reviewId}¦${author}`;if(!candidateUsersByReview.has(k))candidateUsersByReview.set(k,new Set());if(step)candidateUsersByReview.get(k).add(step);}
+    });
+
+    const grouped=new Map();
+    (raw.notes||[]).forEach(r=>{
+      const reviewId=cell(r,['review_id']),author=cell(r,['created_by','author']),round=cell(r,['round_num'])||'1';
+      if(!reviewId||!author)return;
+      const k=`${key(reviewId)}¦${key(round)}¦${key(author)}`;
+      if(!grouped.has(k))grouped.set(k,{reviewId,authorId:author,round,createdAt:'',updatedAt:'',hasNote:false,hasComment:false,candidateSteps:[]});
+      const e=grouped.get(k),created=cell(r,['created_at']),updated=cell(r,['updated_at']),note=cell(r,['note']);
+      if(created&&(!e.createdAt||created<e.createdAt))e.createdAt=created;
+      if(updated&&(!e.updatedAt||updated>e.updatedAt))e.updatedAt=updated;
+      if(note)e.hasNote=true;
+    });
+
+    const byReview=new Map();
+    grouped.forEach(e=>{
+      const k=`${key(e.reviewId)}¦${key(e.round)}¦${key(e.authorId)}`;
+      e.hasComment=commentKeys.has(k);
+      e.silent=!e.hasComment&&!e.hasNote;
+      const instance=reviewInstance.get(key(e.reviewId));
+      const steps=candidateUsersByReview.get(`${key(e.reviewId)}¦${key(e.authorId)}`)||(instance&&candidateUsersByInstance.get(`${instance}¦${key(e.authorId)}`));
+      e.candidateSteps=steps?Array.from(steps):[];
+      const rk=key(e.reviewId);if(!byReview.has(rk))byReview.set(rk,[]);byReview.get(rk).push(e);
+    });
+
+    // Index directs et indépendants de l'historique graphique. Ils évitent qu'une
+    // ligne perde ses soumissions lorsque le WF a été retrouvé par numéro ou par URN.
+    const byWorkflowNumber=new Map(),byEntity=new Map();
+    byReview.forEach((events,reviewId)=>{const seq=reviewSequence.get(reviewId);if(seq)byWorkflowNumber.set(seq,events);});
+    (raw.documents||[]).forEach(r=>{
+      const reviewId=key(cell(r,['review_id'])),urn=cell(r,['versioned_urn']);
+      const events=byReview.get(reviewId);if(!urn||!events)return;
+      let keys=[];try{keys=typeof v57EntityKeys==='function'?v57EntityKeys(urn):[];}catch(e){}
+      keys.forEach(k=>{if(k)byEntity.set(k,events);});
+    });
+    s.submissionEventsByReview=byReview;
+    s.submissionEventsByWorkflowNumber=byWorkflowNumber;
+    s.submissionEventsByEntity=byEntity;
+
+    const seen=new Set();
+    ['byEntity','byReviewId','byReviewUrl','byWorkflowNumber'].forEach(mapName=>{
+      const map=s[mapName];if(!(map instanceof Map))return;
+      map.forEach(entry=>{
+        if(!entry||seen.has(entry))return;seen.add(entry);
+        const events=byReview.get(key(entry.reviewId))||[];
+        entry.submissionEvents=events;
+        entry.silentSubmissionEvents=events.filter(e=>e.silent);
+      });
+    });
+    const silentCount=Array.from(grouped.values()).filter(e=>e.silent).length;
+    s.stats=Object.assign({},s.stats||{}, {
+      candidates:(raw.candidates||[]).length,steps:(raw.steps||[]).length,workflows:(raw.workflows||[]).length,tasks:(raw.tasks||[]).length,silentSubmissions:silentCount
+    });
+    window.__v212SubmissionStats={events:grouped.size,silent:silentCount,reviews:byReview.size,candidates:(raw.candidates||[]).length};
+    document.querySelectorAll('.status-history:not(.hidden)').forEach(el=>{
+      const extra=`<div class="text-[10px] text-amber-700 dark:text-amber-300 font-semibold mt-1">Événements silencieux bruts à contrôler : ${silentCount.toLocaleString('fr-FR')} — le rapprochement auteur/rôle est effectué à la génération</div>`;
+      if(!el.querySelector('.v212-silent-import-info')){
+        const d=document.createElement('div');d.className='v212-silent-import-info';d.innerHTML=extra;el.appendChild(d);
+      }else el.querySelector('.v212-silent-import-info').innerHTML=extra;
+    });
+  }
+
+  function historyForRow(row){
+    try{return v57FindHistoryForDocument({wfData:row&&row.wfData,fileUrl:row&&row.extractedFileUrl,directFileUrl:row&&row.extractedFileUrl,pathUrl:row&&row.extractedPathUrl,workflowUrl:row&&row.extractedWorkflowUrl,nomComplet:row&&row.extractedNom,exactName:row&&row.exactName,version:row&&row.extractedVersion})||{};}catch(e){return{};}
+  }
+  function eventsForRow(row){
+    const s=reviewState(),wf=row&&row.wfData||{},out=[],seen=new Set();
+    const h=historyForRow(row);
+    const byNumber=s&&s.submissionEventsByWorkflowNumber;
+    const sequence=String(wf.id||row&&row.extractedWorkflow||'').match(/\d+/);
+    const numberEvents=sequence&&byNumber&&byNumber.get(key(sequence[0]));
+    const expected=key(wf.reviewId||h.reviewId||(numberEvents&&numberEvents[0]&&numberEvents[0].reviewId));
+    const add=list=>(Array.isArray(list)?list:[]).forEach(e=>{
+      // Une URN peut servir dans plusieurs revues : seul le review_id du WF
+      // courant peut alimenter ses événements de soumission.
+      if(expected&&key(e.reviewId)!==expected)return;
+      const k=[key(e.reviewId),key(e.round),key(e.authorId)].join('¦');
+      if(!seen.has(k)){seen.add(k);out.push(e);}
+    });
+    add(h&&h.submissionEvents);
+    if(!s)return out;
+    const uuidValues=[wf.reviewId,wf.wfUrl,row&&row.extractedWorkflowUrl];
+    uuidValues.forEach(value=>{
+      const matches=String(value||'').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ig)||[];
+      matches.forEach(id=>add(s.submissionEventsByReview&&s.submissionEventsByReview.get(key(id))));
+    });
+    [wf.id,row&&row.extractedWorkflow].forEach(value=>{
+      const m=String(value||'').match(/\d+/);if(m)add(s.submissionEventsByWorkflowNumber&&s.submissionEventsByWorkflowNumber.get(key(m[0])));
+    });
+    [row&&row.extractedFileUrl,row&&row.extractedPathUrl,wf.fileUrl].forEach(value=>{
+      let keys=[];try{keys=typeof v57EntityKeys==='function'?v57EntityKeys(value):[];}catch(e){}
+      keys.forEach(k=>add(s.submissionEventsByEntity&&s.submissionEventsByEntity.get(k)));
+    });
+    return out;
+  }
+  function refreshRow(row){
+    if(!row||!row.wfData)return false;
+    const wf=row.wfData,events=eventsForRow(row);
+    const silent=[];
+    events.forEach(event=>{
+      const info=eventRoles(event,row,wf);if(!info.relevant)return;
+      if(event.silent){
+        // V232 : une soumission sans commentaire satisfait le rôle obligatoire,
+        // tout en restant tracée dans la colonne qualité dédiée.
+        info.roles.forEach(role=>{
+          try{registerRoleActivity(wf,role,{submitted:true,commented:false,member:info.member});}catch(e){}
+        });
+        silent.push(Object.assign({},event,info,{displayKind:'silent-submission'}));
+        return;
+      }
+      info.roles.forEach(role=>{
+        try{registerRoleActivity(wf,role,{submitted:true,commented:!!(event.hasComment||event.hasNote),member:info.member});}catch(e){}
+      });
+      if(event.hasNote&&!event.hasComment){
+        // La note de progression est une contribution textuelle attribuable au rôle,
+        // donc elle lève le blocage. L'absence de commentaire documentaire reste
+        // néanmoins signalée dans la dernière colonne comme pratique à améliorer.
+        silent.push(Object.assign({},event,info,{displayKind:'progress-note'}));
+      }
+    });
+    const text=formatSilent(silent);
+    row.extractedWfSilentSubmissions=text;
+    wf.silentSubmissions=text;
+    wf.silentSubmissionEvents=silent;
+    try{delete wf.__finalizedCacheKey;}catch(e){wf.__finalizedCacheKey='';}
+    try{finalizeWorkflowRoleInfo(wf);}catch(e){console.warn('[V212] Recalcul rôles',e);}
+    try{row.extractedRolesReq=formatRoleListForOutput(wf.rolesReqCalculated||'');}catch(e){row.extractedRolesReq=wf.rolesReqCalculated||row.extractedRolesReq||'';}
+    try{row.extractedRolesBlk=formatRoleListForOutput(wf.rolesBlkCalculated||'');}catch(e){row.extractedRolesBlk=wf.rolesBlkCalculated||row.extractedRolesBlk||'';}
+    row.extractedRolesReqDetails=wf.rolesReqDetails||row.extractedRolesReqDetails||'';
+    row.extractedRolesBlkDetails=wf.rolesBlkDetails||'';
+    row.extractedRolesNoComment=wf.rolesNoCommentCalculated||'';
+    row.extractedRolesNoCommentDetails=wf.rolesNoCommentDetails||'';
+    row.extractedRoleAnalysisStatus=wf.roleAnalysisStatus||'';
+    row.extractedFinalApprover=wf.apprCalculated||wf.finalApprover||row.extractedFinalApprover||'';
+    return true;
+  }
+  function refreshRows(redraw){
+    buildSubmissionIndex();
+    const seen=new Set(),lists=[];
+    try{if(typeof processedData!=='undefined'&&Array.isArray(processedData))lists.push(processedData);}catch(e){}
+    try{if(typeof filteredData!=='undefined'&&Array.isArray(filteredData))lists.push(filteredData);}catch(e){}
+    if(Array.isArray(window.processedData))lists.push(window.processedData);
+    if(Array.isArray(window.filteredData))lists.push(window.filteredData);
+    let changed=0;lists.forEach(list=>list.forEach(row=>{if(!row||seen.has(row))return;seen.add(row);if(refreshRow(row))changed++;}));
+    try{if(typeof window.v106RefreshRoleSelect==='function')window.v106RefreshRoleSelect();}catch(e){}
+    if(changed&&redraw){
+      // Si un filtre bloquant est actif, il doit être recalculé après la mise à jour
+      // des rôles ; réafficher filteredData seul conserverait une ancienne sélection.
+      if(window.__v106FilterBlockingRoles&&typeof window.applyFilters==='function'){
+        try{window.applyFilters();}catch(e){console.warn('[V214] Refiltrage rôles bloquants',e);}
+      }else{
+        try{if(typeof renderTableData==='function')renderTableData();}catch(e){}
+        try{if(typeof updateDashboard==='function')updateDashboard();}catch(e){}
+        try{if(typeof updatePageDeGarde==='function')updatePageDeGarde();}catch(e){}
+      }
+    }
+    window.__v212RowsRefreshed=changed;return changed;
+  }
+  window.v212RefreshSilentSubmissions=refreshRows;
+
+  const baseBuild=window.v57BuildReviewHistoryIndexes||((typeof v57BuildReviewHistoryIndexes==='function')?v57BuildReviewHistoryIndexes:null);
+  if(typeof baseBuild==='function'&&!baseBuild.__v212Wrapped){
+    const wrapped=function(){const result=baseBuild.apply(this,arguments);buildSubmissionIndex();return result;};
+    wrapped.__v212Wrapped=true;wrapped.__v212Original=baseBuild;
+    window.v57BuildReviewHistoryIndexes=wrapped;try{v57BuildReviewHistoryIndexes=wrapped;}catch(e){}
+  }
+
+  const baseExtract=window.extractReviewHistoryFromCsvRows||((typeof extractReviewHistoryFromCsvRows==='function')?extractReviewHistoryFromCsvRows:null);
+  if(typeof baseExtract==='function'&&!baseExtract.__v212Wrapped){
+    const wrapped=function(rows,fileName){
+      const cleanRows=(rows||[]).filter(r=>r&&Object.values(r).some(v=>clean(v)!==''));
+      const type=detectExtended(cleanRows,fileName);
+      if(!type)return baseExtract.apply(this,arguments);
+      const s=reviewState(),raw=ensureRaw(s);if(!raw)return;
+      raw[type]=raw[type].concat(cleanRows);
+      try{v57BuildReviewHistoryIndexes();}catch(e){console.error('[V212] Index historique étendu',e);}
+      setTimeout(()=>{try{if(window.v185RebuildAuthorMappings)window.v185RebuildAuthorMappings();}catch(e){}},80);
+    };
+    wrapped.__v212Wrapped=true;wrapped.__v212Original=baseExtract;
+    window.extractReviewHistoryFromCsvRows=wrapped;try{extractReviewHistoryFromCsvRows=wrapped;}catch(e){}
+  }
+
+  const baseProcess=window.processAllData||((typeof processAllData==='function')?processAllData:null);
+  if(false && typeof baseProcess==='function'&&!baseProcess.__v212Wrapped){
+    // V224-PERF : orchestration déjà réalisée une seule fois dans processDashboardV166.
+    const wrapped=async function(){const result=await baseProcess.apply(this,arguments);refreshRows(true);return result;};
+    wrapped.__v212Wrapped=true;wrapped.__v212Original=baseProcess;
+    window.processAllData=wrapped;try{processAllData=wrapped;}catch(e){}
+  }
+
+  const baseMembers=window.extractMembersFrom2DArray||((typeof extractMembersFrom2DArray==='function')?extractMembersFrom2DArray:null);
+  if(typeof baseMembers==='function'&&!baseMembers.__v212Wrapped){
+    const wrapped=function(){const result=baseMembers.apply(this,arguments);setTimeout(()=>refreshRows(true),120);return result;};
+    wrapped.__v212Wrapped=true;wrapped.__v212Original=baseMembers;
+    window.extractMembersFrom2DArray=wrapped;try{extractMembersFrom2DArray=wrapped;}catch(e){}
+  }
+
+  // Le moteur V207 lit window.v4TemplateRow au moment du clic : on insère donc
+  // la nouvelle colonne sans réécrire les anciens templates historiques.
+  const baseTemplate=window.v4TemplateRow||((typeof v4TemplateRow==='function')?v4TemplateRow:null);
+  if(typeof baseTemplate==='function'&&!baseTemplate.__v212Wrapped){
+    const wrapped=function(row){
+      const result=baseTemplate.apply(this,arguments);if(!result||!Array.isArray(result.values))return result;
+      const out=Object.assign({},result,{values:result.values.slice()});
+      const silent=clean(row&&row.extractedWfSilentSubmissions);
+      if(out.values.length===22)out.values.splice(10,0,silent);
+      else{while(out.values.length<23)out.values.push('');out.values[10]=silent;}
+      return out;
+    };
+    wrapped.__v212Wrapped=true;wrapped.__v212Original=baseTemplate;
+    window.v4TemplateRow=wrapped;try{v4TemplateRow=wrapped;}catch(e){}
+  }
+
+  function versionUi(){
+    window.__CFL_IMMO_DASHBOARD_VERSION__='V214';
+    try{document.title='CFLImmo - Dashboard Documentaire - V214';}catch(e){}
+    document.documentElement.setAttribute('data-dashboard-version','V214');
+  }
+  versionUi();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{versionUi();setTimeout(()=>refreshRows(true),500);},{once:true});
+  [100,1200,3600,6200,8200].forEach(ms=>setTimeout(versionUi,ms));
+  console.info('[V214] Soumissions silencieuses affichées avec le rôle concerné, sans débloquer le rôle tant qu’aucun commentaire réel n’est émis.');
+})();
+</script>
+
+<script id="v221-strict-document-role-contributions">
+(function(){
+  'use strict';
+  if(window.__v221StrictDocumentRoleContributionsInstalled)return;
+  window.__v221StrictDocumentRoleContributionsInstalled=true;
+
+  /*
+     V222 — rôles COB, auteurs uniques et participation au niveau revue/round
+     -------------------------------------------------------------
+     1. Un commentaire documentaire ne répond que pour le fichier
+        exact (review_document_id / URN) et pour le round actif.
+     2. Une note de progression non vide est une contribution au
+        niveau du workflow, mais uniquement pour son auteur/rôle et
+        pour le round actif.
+     3. Une soumission sans commentaire est tracée mais satisfait le rôle obligatoire.
+     4. Une réponse d'un rôle ne libère jamais un autre rôle.
+     5. Les réponses des réviseurs obligatoires du round restent acquises
+        lors du passage en approbation finale. L'initiateur est exclu.
+        L'approbateur final n'est sollicité qu'à son étape.
+     6. Si un membre porte plusieurs rôles requis et que le texte ne
+        précise pas lequel, aucun rôle n'est déduit : ambiguïté signalée.
+  */
+
+  function clean(v){return String(v==null?'':v).replace(/\u00a0/g,' ').trim();}
+  function norm(v){return clean(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[’']/g,' ').replace(/[^A-Za-z0-9.]+/g,' ').replace(/\s+/g,' ').trim().toUpperCase();}
+  function key(v){return clean(v).toLowerCase();}
+  function cell(row,names){
+    const lowered={};Object.keys(row||{}).forEach(k=>lowered[key(k).replace(/\s+/g,'_')]=row[k]);
+    for(const n of names||[]){const v=lowered[key(n).replace(/\s+/g,'_')];if(v!==undefined&&v!==null&&clean(v)!=='')return clean(v);}
+    return '';
+  }
+  function state(){
+    try{if(typeof reviewHistoryState!=='undefined'&&reviewHistoryState)return reviewHistoryState;}catch(e){}
+    return window.reviewHistoryState||null;
+  }
+  function rawState(){const s=state();return s&&s.raw?s.raw:null;}
+  function unique(values){const out=[];(values||[]).forEach(v=>{const x=clean(v);if(x&&!out.includes(x))out.push(x);});return out;}
+  function roleCode(v){try{return normalizeRoleCode(v);}catch(e){return norm(v).replace(/[^A-Z0-9.]/g,'');}}
+  function uniqueRoles(values){const out=[];(values||[]).forEach(v=>{let c=roleCode(v);if(c==='HAVAC')c='HVAC';if(c&&!out.includes(c))out.push(c);});return out;}
+  function uuidValues(v){return String(v||'').match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ig)||[];}
+  function workflowNumber(v){try{return normalizeWorkflowId(v)||'';}catch(e){const m=String(v||'').match(/\d+/);return m?m[0]:'';}}
+  function entityKeys(v){try{return typeof v57EntityKeys==='function'?v57EntityKeys(v):[];}catch(e){return[];}}
+  function roundValue(v){const m=String(v||'').match(/\d+/);return m?String(parseInt(m[0],10)):'1';}
+  function isSameRound(a,b){return roundValue(a)===roundValue(b);}
+
+  function resolveAuthor(id){
+    const raw=clean(id);if(!raw)return 'Utilisateur ACC';
+    try{const v=window.v185ResolveAuthor&&window.v185ResolveAuthor(raw);if(clean(v)&&key(v)!==key(raw))return clean(v);}catch(e){}
+    try{const v=window.v191ResolveMemberId&&window.v191ResolveMemberId(raw);if(clean(v))return clean(v);}catch(e){}
+    const s=state();try{const v=s&&s.usersById&&s.usersById.get(raw);if(clean(v))return clean(v);}catch(e){}
+    return raw;
+  }
+  function memberIds(m){return [m&&m.userId,m&&m.user_id,m&&m.autodeskId,m&&m.autodesk_user_id,m&&m.oxygenId,m&&m.oxygen_id,m&&m.id].map(key).filter(Boolean);}
+  let __v224MembersRef=null,__v224MembersLen=-1,__v224MembersById=new Map(),__v224MembersByName=new Map();
+  function rebuildMemberLookup(){
+    const members=Array.isArray(window.membersDirectory)?window.membersDirectory:[];
+    if(members===__v224MembersRef&&members.length===__v224MembersLen)return;
+    __v224MembersRef=members;__v224MembersLen=members.length;__v224MembersById=new Map();__v224MembersByName=new Map();
+    members.forEach(m=>{
+      memberIds(m).forEach(id=>{if(id&&!__v224MembersById.has(id))__v224MembersById.set(id,m);});
+      [norm(m&&m.name),norm(m&&m.email)].filter(Boolean).forEach(n=>{if(!__v224MembersByName.has(n))__v224MembersByName.set(n,m);});
+    });
+  }
+  function findMember(authorId,authorName){
+    rebuildMemberLookup();
+    const id=key(authorId),name=norm(authorName);
+    return (id&&__v224MembersById.get(id))||(name&&__v224MembersByName.get(name))||null;
+  }
+  function requiredRoles(row,wf,includeFinal){
+    let req=[];
+    try{req=(parseRolesFromWorkflowName(wf&&(wf.wfName||wf.name)||'').requiredRoles)||[];}catch(e){}
+    if(!req.length){
+    if(Array.isArray(wf&&wf.rolesReqList))req=req.concat(wf.rolesReqList);
+    if(Array.isArray(wf&&wf.rolesReqFromName))req=req.concat(wf.rolesReqFromName);
+    req=req.concat(clean(row&&row.extractedRolesReq).split(',').map(x=>x.trim()));
+    if(!req.filter(Boolean).length&&wf&&(wf.wfName||wf.name)){
+      try{req=req.concat((parseRolesFromWorkflowName(wf.wfName||wf.name||'').requiredRoles)||[]);}catch(e){}
+    }
+    }
+    req=uniqueRoles(req);
+    if(includeFinal){const f=finalRole(row,wf);if(f&&!req.includes(f))req.push(f);}
+    return req;
+  }
+  function finalRole(row,wf){try{return roleCode((wf&&(wf.finalApprover||wf.finalApproverFromName||wf.apprCalculated||wf.appr))||(row&&row.extractedFinalApprover)||'');}catch(e){return '';}}
+  function activeRoles(row,wf){
+    // V224 : seules les positions de REVUE OBLIGATOIRE du nom WF peuvent être
+    // satisfaites / bloquées par un commentaire ou une soumission de reviewer.
+    // L'approbateur final est géré exclusivement par l'étape finale active.
+    return requiredRoles(row,wf,false);
+  }
+  function rolesForMember(member,allowed){
+    if(!member||!allowed.length)return[];
+    try{return uniqueRoles(rolesForMemberAgainstRequired(member,allowed));}catch(e){return[];}
+  }
+  function memberRoleLabel(member){
+    const raw=clean(member&&member.roles);if(!raw)return'';
+    const labels=raw.split(',').map(x=>clean(x)).filter(Boolean).map(role=>{
+      const n=norm(role);
+      if(/MANDATAIRE/.test(n))return'MOG - Mandataire';
+      const en=role.match(/^(EN\s*\d+(?:[._]\d+)?)_?(.*)$/i);
+      if(en){
+        const code=String(en[1]||'').replace(/\s+/g,'').replace('_','.').toUpperCase();
+        const label=clean(en[2]).replace(/[_-]+/g,' ').replace(/\bCHEF\s+PROJET\b/i,'Chef de projet');
+        return [code,label].filter(Boolean).join(' – ');
+      }
+      return role.replace(/_/g,' – ').replace(/-/g,' ');
+    });
+    return unique(labels).slice(0,2).join(', ');
+  }
+  function displayRoleList(roles){return (roles||[]).map(r=>r==='MOG'?'MOG - Mandataire':r).join(', ');}
+  function explicitRoles(text,allowed){
+    const src=' '+norm(text)+' ',out=[];
+    const aliases={COSS:'CSS',HAVAC:'HVAC',BUCO:'BDC',OGCE:'BDC',SECO:'OA',AMOCERT:'CERT',BIMMANAGER:'MNB'};
+    const codes=['ARCH','COBARCH','COBSTRU','COBTSPE','BDC','OA','CSS','COSS','CERT','STRU','TSPE','SANI','ELEC','SPRK','HVAC','HAVAC','MOG','MOD','MNB','CFLIMMO','SCFLIMMO','BUCO','OGCE','SECO','AMOCERT','BIMMANAGER'];
+    codes.forEach(c=>{if(new RegExp('(^|[^A-Z0-9])'+c.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'([^A-Z0-9]|$)','i').test(src)){let r=aliases[c]||c;if(r==='CFLIMMO'||r==='SCFLIMMO')r='MOD';if(!out.includes(r))out.push(r);}});
+    const phrases=[[/BUREAU DE CONTROLE|BUREAU CONTROLE|(^| )OGC( |$)/,'BDC'],[/ORGANISME AGREE|(^| )SECO( |$)/,'OA'],[/COORDINATEUR SECURITE|SECURITE SANTE|(^| )HBH( |$)/,'CSS'],[/AMO CERTIFICATION|(^| )IDES( |$)/,'CERT'],[/BIM MANAGER|MANAGER BIM/,'MNB'],[/MANDATAIRE/,'MOG'],[/TPF TECH|TPFT/,'TSPE'],[/TPF STRUCT|TPFS/,'STRU'],[/^ AREP $/,'ARCH']];
+    phrases.forEach(p=>{if(p[0].test(src)&&!out.includes(p[1]))out.push(p[1]);});
+    return uniqueRoles(out).filter(r=>allowed.includes(r));
+  }
+  function resolveContribution(authorId,authorName,text,row,wf,allowedOverride){
+    const name=clean(authorName)||resolveAuthor(authorId),allowed=uniqueRoles(allowedOverride||activeRoles(row,wf));
+    // Une discipline citée dans le corps d'une remarque (ex. « voir STRU »)
+    // n'est pas le rôle de son auteur. Seule une signature/préfixe explicite
+    // peut compléter ou préciser l'identité issue du fichier Membres.
+    const prefix=clean(text).match(/^\s*(?:[-•]\s*)?([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ _-]{1,40})\s*:/);
+    const declared=prefix?prefix[1]:'';
+    const member=findMember(authorId,name),mapped=rolesForMember(member,allowed),explicit=uniqueRoles(explicitRoles(`${name} ${declared}`,allowed).concat(declared?[roleCode(declared)]:[])).filter(r=>allowed.includes(r));
+    let roles=[],ambiguous=false;
+    if(mapped.length===1)roles=mapped;
+    else if(mapped.length>1){roles=mapped.filter(r=>explicit.includes(r));ambiguous=roles.length===0;}
+    else roles=member?[]:explicit;
+    return {name,member,roles:uniqueRoles(roles),ambiguous,allowed,mapped,explicit,memberRoleLabel:memberRoleLabel(member)};
+  }
+
+  function candidateStepFlags(steps){
+    const src=norm((steps||[]).join(' '));
+    return {
+      initiator:/(^| )INITIATOR( |$)|(^| )INITIATEUR( |$)/.test(src),
+      reviewer:/(^| )REVIEWER( |$)|(^| )REVISEUR( |$)|(^| )REVISEUSE( |$)/.test(src),
+      approver:/(^| )APPROVER( |$)|(^| )APPROBATEUR( |$)/.test(src)
+    };
+  }
+  function participationFor(ctx,idx,authorId){
+    const author=key(authorId),meta=ctx&&ctx.meta;
+    if(!author)return {initiator:false,reviewer:false,approver:false,source:''};
+    // created_by dans reviews_reviews est l'initiateur réel de cette instance.
+    // Cette preuve prime sur les rôles généraux du membre et sur sa société.
+    if(meta&&key(meta.createdBy)===author)return {initiator:true,reviewer:false,approver:false,source:'reviews.created_by'};
+    const reviewId=key(ctx&&ctx.reviewId),instance=key(meta&&meta.instanceId);
+    const steps=(idx.candidateStepsByReviewAuthor.get(`${reviewId}¦${author}`)
+      ||(instance&&idx.candidateStepsByInstanceAuthor.get(`${instance}¦${author}`))
+      ||new Set());
+    return Object.assign(candidateStepFlags(Array.from(steps)),{source:steps.size?'reviews_review_candidates':''});
+  }
+  function finalStepActive(row,wf){
+    try{return !!isWorkflowAtFinalApprovalStep(wf||{});}catch(e){return false;}
+  }
+  function contributionEligible(participation,info,row,wf){
+    const p=participation||{};
+    if(p.initiator)return false;
+    const atFinal=finalStepActive(row,wf);
+    if(!atFinal&&p.approver&&!p.reviewer)return false;
+    // Un membre d'un rôle candidat n'est pas toujours listé nominativement :
+    // son rapprochement certain avec un rôle requis de l'étape reste valable.
+    return !!((info&&info.roles&&info.roles.length)||p.reviewer||(atFinal&&p.approver));
+  }
+  function contributionRoles(participation,row,wf,allowed){
+    const p=participation||{},req=requiredRoles(row,wf,false);
+    // V224 — séparation stricte obligatoire / facultatif / approbateur final :
+    // - un Reviewer ne peut agir que sur les rôles explicitement requis dans le nom WF ;
+    // - un Approver (MOG/MNB/MOD...) ne satisfait jamais son rôle final par un simple
+    //   commentaire / workflow_note : son blocage dépend uniquement de l'étape finale ;
+    // - si une même personne est Reviewer + Approver, son activité de revue reste
+    //   limitée aux rôles obligatoires de revue.
+    if(p.reviewer)return req;
+    if(p.approver)return [];
+    return req;
+  }
+  function fileRevisionStatus(row){
+    return clean((row&&row.extractedAccFileStatusRaw)||(row&&row.extractedStatus)||(row&&row.extractedRevisionStatus)||'');
+  }
+  function terminalFileDecision(row){
+    const txt=norm(fileRevisionStatus(row)+' '+clean(row&&row._v221CurrentDocumentDecisionCode));if(!txt)return false;
+    return /(APPROUVE|APPROVED|VALIDE|VALIDATED|VISA A|VISA B|REJETE|REJECTED|REFUSE|REFUSED|VISA C|INVALIDE|INVALID|CADUC|ANNULE|CANCELLED)/.test(txt);
+  }
+  function terminalWorkflowDecision(row,wf){
+    const txt=clean((row&&row.extractedWfGlobalStatus)||(wf&&wf.globStat)||(wf&&wf.globalStatus)||'');
+    if(!txt)return false;
+    try{if(typeof isWorkflowInvalidStatus==='function'&&isWorkflowInvalidStatus(txt))return true;}catch(e){}
+    try{if(typeof isWorkflowClosedStatus==='function'&&isWorkflowClosedStatus(txt))return true;}catch(e){}
+    const n=norm(txt);return /(INVALIDE|INVALID|CADUC|ANNULE|CLOSED|FERME|CLOTURE|COMPLETED|TERMINE|APPROUVE|APPROVED|VALIDE)/.test(n);
+  }
+  function workflowGlobalStatus(row,wf){
+    return clean((row&&row.extractedWfGlobalStatus)||(wf&&wf.globStat)||(wf&&wf.globalStatus)||'');
+  }
+  function activeOpenStatus(value){
+    const txt=norm(value);if(!txt)return false;
+    // V223 : un WF retourné à l'initiateur reste une action OUVERTE et doit donc
+    // conserver son entreprise initiatrice dans les rôles/blocages actifs.
+    return /(OUVERT|OUVERTE|OPEN|EN COURS|REVUE EN COURS|EN REVUE|IN PROGRESS|REVIEW IN PROGRESS|IN REVIEW|RETOURNE CHEZ L INITIATEUR|RETOUR CHEZ L INITIATEUR|EN ATTENTE DE L INITIATEUR|RETURNED TO INITIATOR|WAITING FOR INITIATOR|BACK TO INITIATOR|CHEZ L EMETTEUR|RETURNED TO SENDER)/.test(txt);
+  }
+  function connectorWorkflowLabel(value){
+    const txt=norm(value);if(!txt)return '';
+    if(/(^| )(RESTARTING|RETURNED|WAITING FOR INITIATOR)( |$)/.test(txt))return 'OUVERT chez l’initiateur';
+    if(/(^| )(OPEN|IN PROGRESS|IN REVIEW|REVIEW IN PROGRESS)( |$)/.test(txt))return 'OUVERT';
+    if(/(^| )(VOID|INVALID|INVALIDATED|CANCELLED|CANCELED)( |$)/.test(txt))return 'INVALIDÉ';
+    if(/(^| )(CLOSED|COMPLETED|FINISHED|DONE)( |$)/.test(txt))return 'FERMÉ';
+    return clean(value);
+  }
+  function documentDecision(value){
+    let parsed=value;
+    if(typeof parsed==='string'){
+      const txt=clean(parsed);if(!txt||/^(null|undefined|\{\}|\[\])$/i.test(txt))return null;
+      if(/^[\[{]/.test(txt)){try{parsed=JSON.parse(txt);}catch(e){return null;}}
+      else parsed={value:txt,label:txt};
+    }
+    if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return null;
+    const code=clean(parsed.value||parsed.status||''),rawLabel=clean(parsed.label||'');
+    const known={approved:'Approuvé',rejected:'Rejeté',open:'Revue en cours',in_review:'Revue en cours',void:'Invalidé',invalid:'Invalidé'};
+    const label=rawLabel&&key(rawLabel)!==key(code)?rawLabel:(known[key(code)]||rawLabel||code);
+    return label?{label,code}:null;
+  }
+  function currentRoundStatusResolution(row,wf,ctx){
+    const result={corrected:false,original:'',resolved:'',reason:'',source:''},meta=ctx&&ctx.meta;
+    if(!meta)return result;
+
+    // Le statut global du WF et la décision sur le fichier sont distincts.
+    // Une décision du document exact au round courant prime dès le round 1,
+    // y compris lorsque son workflow est encore ouvert (ex. validation à finaliser).
+    const connectorGlobal=connectorWorkflowLabel(meta.status);
+    if(connectorGlobal){
+      row.extractedWfGlobalStatus=connectorGlobal;
+      wf.globStat=connectorGlobal;wf.globalStatus=connectorGlobal;
+    }
+    const currentDocs=(ctx.docs||[]).filter(d=>isSameRound(d.round,ctx.activeRound));
+    const previousDocs=(ctx.docs||[]).filter(d=>!isSameRound(d.round,ctx.activeRound));
+    if(!currentDocs.length)return result;
+    const decisions=currentDocs.map(d=>({doc:d,decision:documentDecision(d.status)})).filter(x=>x.decision)
+      .sort((a,b)=>clean(b.doc.updatedAt||b.doc.createdAt).localeCompare(clean(a.doc.updatedAt||a.doc.createdAt)));
+    if(decisions.length){
+      const preferred=decisions[0].decision;
+      result.source='reviews_review_documents.status';
+      row._v221CurrentDocumentDecisionCode=preferred.code;
+      if(norm(preferred.label)!==norm(fileRevisionStatus(row))||clean(row.extractedRevisionStatus)!==preferred.label){
+        result.corrected=true;result.original=fileRevisionStatus(row);result.resolved=preferred.label;
+        result.reason=`statut explicite du document au round ${ctx.activeRound}`;
+        row.extractedAccFileStatusRaw=preferred.label;row.extractedStatus=preferred.label;row.extractedRevisionStatus=preferred.label;wf.revStat=preferred.label;
+      }
+      return result;
+    }
+    delete row._v221CurrentDocumentDecisionCode;
+    if(!activeOpenStatus(connectorGlobal)||!previousDocs.length)return result;
+
+    // Cas des workflows relancés : un statut terminal importé depuis un round
+    // antérieur ne doit pas être affiché comme statut courant lorsque le même
+    // document figure de nouveau dans le round actif d'un WF ouvert.
+    if(terminalFileDecision(row)){
+      result.corrected=true;result.original=fileRevisionStatus(row);result.resolved='Revue en cours';
+      result.reason=`document relancé au round ${ctx.activeRound} d'un workflow ouvert`;
+      result.source='reviews_reviews.status + reviews_review_documents.round_num';
+      row.extractedAccFileStatusRaw=result.resolved;row.extractedStatus=result.resolved;row.extractedRevisionStatus=result.resolved;wf.revStat=result.resolved;
+      row._v220OriginalFileStatus=result.original;row._v220StatusSource=result.source;
+    }
+    return result;
+  }
+  function blockingEligibility(row,wf){
+    if(terminalWorkflowDecision(row,wf))return {eligible:false,reason:'workflow fermé, approuvé, invalidé ou caduc'};
+    if(terminalFileDecision(row) && !activeOpenStatus(workflowGlobalStatus(row,wf)))return {eligible:false,reason:`statut documentaire terminal : ${fileRevisionStatus(row)}`};
+    const fileStatus=fileRevisionStatus(row),globalStatus=workflowGlobalStatus(row,wf);
+    // Règle métier V220 : le filtre des rôles bloquants est une vue des actions
+    // actuellement ouvertes. « En attente », vide ou tout autre statut n'y entre pas.
+    const returnedFile=/(RETOURNE|INITIATEUR|RETURNED TO INITIATOR)/.test(norm(fileStatus));
+    let returnedStep=false;try{returnedStep=!!isWorkflowWaitingForInitiator(wf||{});}catch(e){}
+    if(!activeOpenStatus(fileStatus)&&!(returnedFile&&returnedStep)&&!activeOpenStatus(globalStatus))return {eligible:false,reason:`statut documentaire hors périmètre Ouvert/En cours : ${fileStatus||'vide'}`};
+    if(globalStatus&&!activeOpenStatus(globalStatus))return {eligible:false,reason:`statut workflow hors périmètre Ouvert/En cours : ${globalStatus}`};
+    return {eligible:true,reason:'document et workflow ouverts/en cours'};
+  }
+  window.v218IsBlockingEligibleRow=function(row){return blockingEligibility(row,row&&row.wfData||{}).eligible;};
+  window.v219IsBlockingEligibleRow=window.v218IsBlockingEligibleRow;
+  window.v220IsBlockingEligibleRow=window.v218IsBlockingEligibleRow;
+  window.v221IsBlockingEligibleRow=window.v218IsBlockingEligibleRow;
+
+  let __v224StrictIdxRaw=null,__v224StrictIdxSig='',__v224StrictIdxCache=null;
+  let __v225CommentsRef=null,__v225CommentsLen=-1;
+  function buildStrictIndex(){
+    const raw=rawState();if(!raw)return null;
+    if(raw.comments!==__v225CommentsRef || (raw.comments||[]).length!==__v225CommentsLen){
+      raw.comments=canonicalReviewComments(raw.comments||[]);
+      __v225CommentsRef=raw.comments;__v225CommentsLen=raw.comments.length;
+    }
+    const __sig=['reviews','candidates','documents','comments','notes'].map(k=>Array.isArray(raw[k])?raw[k].length:0).join('|');
+    if(raw===__v224StrictIdxRaw&&__sig===__v224StrictIdxSig&&__v224StrictIdxCache)return __v224StrictIdxCache;
+    const reviewsById=new Map(),reviewsBySequence=new Map(),commentsByDoc=new Map(),commentsByReview=new Map(),notesByReview=new Map(),docsByEntity=new Map(),docsByReview=new Map(),reviewByDoc=new Map(),candidateStepsByReviewAuthor=new Map(),candidateStepsByInstanceAuthor=new Map();
+    (raw.reviews||[]).forEach(r=>{
+      const id=key(cell(r,['id']));if(!id)return;
+      const meta={id:cell(r,['id']),sequenceId:workflowNumber(cell(r,['sequence_id'])),currentRound:roundValue(cell(r,['current_round_num'])||'1'),status:cell(r,['status']),instanceId:cell(r,['instance_id']),createdBy:cell(r,['created_by']),currentStep:cell(r,['current_step']),totalSteps:cell(r,['total_steps'])};
+      reviewsById.set(id,meta);if(meta.sequenceId){if(!reviewsBySequence.has(meta.sequenceId))reviewsBySequence.set(meta.sequenceId,[]);reviewsBySequence.get(meta.sequenceId).push(meta);}
+    });
+    (raw.candidates||[]).forEach(r=>{
+      if(norm(cell(r,['candidate_type']))!=='USER')return;
+      const reviewId=key(cell(r,['id','review_id'])),instance=key(cell(r,['instance_id'])),author=key(cell(r,['candidate_oxygen_id'])),step=cell(r,['step_name','step_display_name']);
+      if(!author||!step)return;
+      if(reviewId){const k=`${reviewId}¦${author}`;if(!candidateStepsByReviewAuthor.has(k))candidateStepsByReviewAuthor.set(k,new Set());candidateStepsByReviewAuthor.get(k).add(step);}
+      if(instance){const k=`${instance}¦${author}`;if(!candidateStepsByInstanceAuthor.has(k))candidateStepsByInstanceAuthor.set(k,new Set());candidateStepsByInstanceAuthor.get(k).add(step);}
+    });
+
+    // Indexer les documents avant les commentaires afin de rattacher chaque contribution à sa revue.
+    (raw.documents||[]).forEach(r=>{
+      const docId=key(cell(r,['id'])),reviewId=key(cell(r,['review_id'])),urn=cell(r,['versioned_urn']);if(!docId||!reviewId)return;
+      reviewByDoc.set(docId,reviewId);
+      const rec={docId,reviewId,urn,round:roundValue(cell(r,['round_num'])||'1'),status:cell(r,['status']),createdAt:cell(r,['created_at']),updatedAt:cell(r,['updated_at'])};
+      if(!docsByReview.has(reviewId))docsByReview.set(reviewId,[]);
+      if(!docsByReview.get(reviewId).some(x=>x.docId===docId))docsByReview.get(reviewId).push(rec);
+      if(urn)entityKeys(urn).forEach(k=>{if(!docsByEntity.has(k))docsByEntity.set(k,[]);const a=docsByEntity.get(k);if(!a.some(x=>x.docId===docId&&x.reviewId===reviewId))a.push(rec);});
+    });
+
+    const commentSeen=new Set();
+    (raw.comments||[]).forEach(r=>{
+      // Un commentaire supprimé n'est jamais une contribution active.
+      if(cell(r,['deleted_at']))return;
+      const doc=key(cell(r,['review_document_id'])),authorId=cell(r,['created_by','author']),text=cell(r,['text']),round=roundValue(cell(r,['round_num'])||'1');if(!doc||!text)return;
+      const fingerprint=[doc,key(authorId),round,norm(text)].join('¦');
+      if(commentSeen.has(fingerprint))return;commentSeen.add(fingerprint);
+      const rec={docId:doc,authorId,text,round,createdAt:cell(r,['created_at']),updatedAt:cell(r,['updated_at'])};
+      if(!commentsByDoc.has(doc))commentsByDoc.set(doc,[]);commentsByDoc.get(doc).push(rec);
+      const reviewId=reviewByDoc.get(doc);
+      if(reviewId){if(!commentsByReview.has(reviewId))commentsByReview.set(reviewId,[]);commentsByReview.get(reviewId).push(rec);}
+    });
+
+    const noteSeen=new Set();
+    (raw.notes||[]).forEach(r=>{
+      const reviewId=key(cell(r,['review_id'])),authorId=cell(r,['created_by','author']),note=cell(r,['note']),round=roundValue(cell(r,['round_num'])||'1');if(!reviewId||!authorId)return;
+      const fingerprint=[reviewId,key(authorId),round,norm(note)].join('¦');
+      if(noteSeen.has(fingerprint))return;noteSeen.add(fingerprint);
+      if(!notesByReview.has(reviewId))notesByReview.set(reviewId,[]);
+      notesByReview.get(reviewId).push({reviewId,authorId,note,round,createdAt:cell(r,['created_at']),updatedAt:cell(r,['updated_at'])});
+    });
+    const idx={reviewsById,reviewsBySequence,commentsByDoc,commentsByReview,notesByReview,docsByEntity,docsByReview,reviewByDoc,candidateStepsByReviewAuthor,candidateStepsByInstanceAuthor};
+    window.__v215StrictIndex=idx;
+    __v224StrictIdxRaw=raw;__v224StrictIdxSig=__sig;__v224StrictIdxCache=idx;
+    return idx;
+  }
+
+  function historyForRow(row){
+    try{return v57FindHistoryForDocument({wfData:row&&row.wfData,fileUrl:row&&row.extractedFileUrl,directFileUrl:row&&row.extractedFileUrl,pathUrl:row&&row.extractedPathUrl,workflowUrl:row&&row.extractedWorkflowUrl,nomComplet:row&&row.extractedNom,exactName:row&&row.exactName,version:row&&row.extractedVersion})||{};}catch(e){return{};}
+  }
+  function rowContext(row,idx){
+    const wf=row&&row.wfData||{},history=historyForRow(row),reviewIds=new Set();
+    [wf.reviewId,wf.wfUrl,row&&row.extractedWorkflowUrl,history&&history.reviewId].forEach(v=>uuidValues(v).forEach(x=>{if(idx.reviewsById.has(key(x)))reviewIds.add(key(x));}));
+    const sequences=unique([workflowNumber(wf.id),workflowNumber(row&&row.extractedWorkflow),workflowNumber(history&&history.sequenceId)]);
+    sequences.forEach(seq=>(idx.reviewsBySequence.get(seq)||[]).forEach(m=>reviewIds.add(key(m.id))));
+    const docCandidates=[];
+    // Choisir d'abord l'identifiant de LA ligne et sa version : le VFROOT ne doit
+    // pas rattacher à V1 un commentaire ou une approbation portant sur V2.
+    const refs=[row&&row.extractedFileUrl,row&&row.extractedPathUrl,wf.fileUrl];
+    let documentKeys=[];
+    for(const ref of refs){
+      const keys=entityKeys(ref),versioned=keys.filter(k=>/^__VF__.*\?VERSION=\d+$/i.test(k));
+      if(versioned.length){documentKeys=versioned;break;}
+      const roots=keys.filter(k=>/^__VFROOT__/i.test(k));
+      if(roots.length){
+        const version=clean(row&&row.extractedVersion).match(/^(?:V(?:ERSION)?\s*)?(\d+)$/i);
+        documentKeys=version?roots.map(k=>k.replace(/^__VFROOT__/i,'__VF__')+'?VERSION='+version[1]):roots;
+        break;
+      }
+    }
+    documentKeys.forEach(k=>(idx.docsByEntity.get(k)||[]).forEach(d=>{if(!docCandidates.some(x=>x.docId===d.docId&&x.reviewId===d.reviewId))docCandidates.push(d);}));
+    let docs=docCandidates;
+    if(reviewIds.size){const matched=docs.filter(d=>reviewIds.has(d.reviewId));if(matched.length)docs=matched;else docs=[];}
+    if(!reviewIds.size&&docs.length){const ids=unique(docs.map(d=>d.reviewId));if(ids.length===1)reviewIds.add(ids[0]);else docs=[];}
+    if(docs.length){const ids=unique(docs.map(d=>d.reviewId));if(ids.length===1){reviewIds.clear();reviewIds.add(ids[0]);}}
+    let reviewId=reviewIds.size===1?Array.from(reviewIds)[0]:'';
+    if(!reviewId&&docs.length)reviewId=docs[0].reviewId;
+    const meta=reviewId?idx.reviewsById.get(reviewId):null;
+    if(meta&&/^\d+$/.test(meta.currentStep)&&/^\d+$/.test(meta.totalSteps)&&+meta.totalSteps>0){
+      wf._v221CurrentStepIsFinal=+meta.currentStep===+meta.totalSteps;
+    }else delete wf._v221CurrentStepIsFinal;
+    let activeRound=meta&&meta.currentRound?meta.currentRound:'';
+    if(!activeRound){const rounds=[];docs.forEach(d=>(idx.commentsByDoc.get(d.docId)||[]).forEach(c=>rounds.push(parseInt(c.round,10)||1)));(idx.notesByReview.get(reviewId)||[]).forEach(n=>rounds.push(parseInt(n.round,10)||1));activeRound=String(rounds.length?Math.max(...rounds):1);}
+    const comments=[];docs.forEach(d=>(idx.commentsByDoc.get(d.docId)||[]).forEach(c=>{const id=[c.docId,c.authorId,c.round,c.createdAt,c.text].join('¦');if(!comments.some(x=>x.__id===id))comments.push(Object.assign({__id:id},c));}));
+    // La satisfaction d'un rôle est au niveau de la revue/round : un réviseur qui a
+    // commenté un document du WF a bien contribué à la revue, même si une autre ligne
+    // du même WF correspond à un document frère sans commentaire propre.
+    const reviewComments=reviewId?(idx.commentsByReview.get(reviewId)||[]):comments;
+    const notes=reviewId?(idx.notesByReview.get(reviewId)||[]):[];
+    return {history,reviewId,meta,docs,comments,reviewComments,notes,activeRound,exactDocument:docs.length>0};
+  }
+
+  function blockForRound(text,round){
+    const src=clean(text);if(!src)return '';
+    const re=/^\s*ROUND\s+(\d+)\s*$/gim,matches=[];let m;
+    while((m=re.exec(src)))matches.push({round:roundValue(m[1]),start:m.index,bodyStart:re.lastIndex});
+    if(!matches.length)return src;
+    for(let i=0;i<matches.length;i++){if(matches[i].round===roundValue(round)){const end=i+1<matches.length?matches[i+1].start:src.length;return src.slice(matches[i].bodyStart,end).trim();}}
+    return '';
+  }
+  function textEntries(text){
+    try{if(typeof v58ExtractCommentAuthors==='function'){const a=v58ExtractCommentAuthors(text);if(a&&a.length)return a.map(e=>({author:e.author,body:e.body||''}));}}catch(e){}
+    const out=[],lines=String(text||'').split(/\r?\n/),marker=/^\s*-?\s*([^(:\n]{2,100}?)\s*\([^)]{4,100}\)\s*:\s*(.*)$/;let current=null;
+    const flush=()=>{if(current){current.body=current.parts.join('\n').trim();out.push(current);}};
+    lines.forEach(line=>{const m=line.match(marker);if(m){flush();current={author:m[1].trim(),parts:[m[2]||'']};}else if(current)current.parts.push(line);});flush();
+    return out;
+  }
+  function register(wf,roles,member,commented){
+    roles.forEach(role=>{try{registerRoleActivity(wf,role,{submitted:true,commented:!!commented,member});}catch(e){}});
+  }
+  function applyFormattedText(text,row,wf,allowed,kind,ambiguities){
+    const entries=textEntries(text);
+    if(entries.length){entries.forEach(e=>{const info=resolveContribution('',e.author,e.body,row,wf,allowed);if(info.ambiguous)ambiguities.push(`${info.name} : ${info.mapped.join(', ')}`);register(wf,info.roles,info.member,true);});return;}
+    const info=resolveContribution('','',text,row,wf,allowed);if(info.ambiguous)ambiguities.push(`Texte ${kind||'contribution'} : ${info.mapped.join(', ')}`);register(wf,info.roles,info.member,true);
+  }
+  function formatDate(v){try{return typeof v57FormatDate==='function'?v57FormatDate(v):clean(v);}catch(e){return clean(v);}}
+  function mergeSilentSignalTexts(strictText,legacyText){
+    const strict=clean(strictText),legacy=clean(legacyText);
+    if(!strict)return legacy;
+    if(!legacy)return strict;
+    const seen=new Set(),rounds=new Map();
+    function add(text,prefer){
+      let round='1';
+      String(text||'').split(/\r?\n/).forEach(raw=>{
+        const line=clean(raw);if(!line)return;
+        const rm=line.match(/^ROUND\s+(\d+)/i);if(rm){round=String(parseInt(rm[1],10)||1);if(!rounds.has(round))rounds.set(round,[]);return;}
+        if(!/^[-•]\s*/.test(line))return;
+        if(!rounds.has(round))rounds.set(round,[]);
+        const body=line.replace(/^[-•]\s*/,''),identity=clean(body.split(' — ')[0]);
+        const k=round+'¦'+norm(identity.replace(/\s*\([^)]*\)\s*$/,''));
+        if(seen.has(k))return;
+        seen.add(k);rounds.get(round).push('- '+body);
+      });
+    }
+    add(strict,true);add(legacy,false);
+    return Array.from(rounds.keys()).sort((a,b)=>(+a)-(+b)).map(r=>`ROUND ${r}\n${rounds.get(r).join('\n')}`).join('\n\n');
+  }
+  function formatSignals(events){
+    const byActor=new Map();events.forEach(e=>{const k=roundValue(e.round)+'¦'+norm(e.info&&e.info.name);const prev=byActor.get(k);if(!prev||prev.kind==='silent-submission'&&e.kind==='progress-note')byActor.set(k,e);});
+    const byRound=new Map();byActor.forEach(e=>{const r=roundValue(e.round);if(!byRound.has(r))byRound.set(r,[]);byRound.get(r).push(e);});
+    return Array.from(byRound.keys()).sort((a,b)=>(+a)-(+b)).map(round=>{
+      const lines=byRound.get(round).sort((a,b)=>clean(a.createdAt).localeCompare(clean(b.createdAt))).map(e=>{
+        const company=e.info&&e.info.member?clean(e.info.member.companyShort||e.info.member.company):'';
+        const roles=e.finalApproverBlocking?displayRoleList([e.finalApproverCode])
+          :e.info&&e.info.roles&&e.info.roles.length?displayRoleList(e.info.roles)
+          :(clean(e.info&&e.info.memberRoleLabel)||(e.info&&e.info.ambiguous?'rôle ambigu à contrôler':'rôle à identifier'));
+        const attribution=[roles,company].filter(Boolean).join(' / ');
+        let observation='';
+        if(e.blockingExcluded){
+          observation=(e.kind==='progress-note'?'Note de progression renseignée sans commentaire documentaire':'Soumis sans commentaire')+` · non retenu comme blocage actuel (${e.blockingExcluded}) · traçabilité`;
+        }else if(!e.isActiveRound){
+          observation=(e.kind==='progress-note'?'Note de progression renseignée sans commentaire documentaire':'Soumis sans commentaire')+' · round antérieur (traçabilité uniquement)';
+        }else if(e.finalApproverBlocking){
+          observation=e.kind==='silent-submission'
+            ? `Soumis sans commentaire · approbateur final ${e.finalApproverCode} débloqué par sa soumission · commentaire textuel absent · pratique à améliorer`
+            : `Note de progression renseignée sans commentaire documentaire · approbateur final ${e.finalApproverCode} maintenu bloquant en l’absence de soumission à l’étape finale`;
+          if(e.commentedElsewhere)observation+=' · commentaire sur un autre fichier du WF, sans commentaire sur ce fichier';
+        }else if(e.commentedElsewhere){
+          // V232 : la soumission du fichier affiché débloque le rôle, même si le
+          // commentaire documentaire a été saisi sur un document frère.
+          if(e.kind==='progress-note'){
+            observation='Note de progression du WF (visible dans « Notes WF » pour tous ses fichiers)'
+              +' · commentaire documentaire du même auteur rattaché à un autre fichier du round, absent de ce fichier'
+              +' · '+(e.optionalReviewer?'intervention facultative, aucun rôle obligatoire débloqué':'rôle débloqué par la note de progression du WF')
+              +' · traçabilité';
+          }else{
+            observation='Soumis sans commentaire sur ce fichier'
+              +' · cet auteur a commenté un autre fichier du même WF, mais pas ce fichier'
+              +' · '+(e.optionalReviewer?'intervention facultative, aucun rôle obligatoire débloqué'
+                :'rôle obligatoire débloqué par la soumission de ce fichier · commentaire textuel absent · pratique à améliorer')
+              +' · traçabilité';
+          }
+        }else if(e.optionalReviewer){
+          const p=e.participation||{};
+          if(p.approver&&!p.reviewer){
+            observation=e.kind==='progress-note'
+              ? 'Note de progression renseignée sans commentaire documentaire · intervention facultative de l’approbateur final · aucun rôle obligatoire de revue débloqué ; le blocage final dépend uniquement de l’étape active'
+              : 'Soumission de l’approbateur final · facultative pendant la revue · aucun rôle obligatoire de revue concerné ; le blocage final dépend uniquement de l’étape active';
+          }else{
+            observation=e.kind==='progress-note'
+              ? 'Note de progression renseignée sans commentaire documentaire · intervention facultative · aucun rôle obligatoire de revue débloqué · pratique à améliorer'
+              : 'Soumis sans commentaire · auteur hors des réviseurs obligatoires de ce WF · aucun rôle obligatoire de revue débloqué · traçabilité';
+          }
+        }else if(e.kind==='progress-note'){
+          observation=e.released
+            ? 'Note de progression renseignée sans commentaire documentaire · rôle obligatoire débloqué · pratique à améliorer'
+            : 'Note de progression renseignée sans commentaire documentaire · aucun rôle obligatoire de revue débloqué · pratique à améliorer';
+        }else{
+          observation=e.blockingRelevant
+            ? 'Soumis sans commentaire · rôle obligatoire débloqué par la soumission · commentaire textuel absent · pratique à améliorer'
+            : 'Soumission enregistrée · aucun rôle obligatoire de revue concerné';
+        }
+        return `- ${e.info.name}${formatDate(e.createdAt||e.updatedAt)?' ('+formatDate(e.createdAt||e.updatedAt)+')':''} — ${attribution} — ${observation}`;
+      });
+      return `ROUND ${round}\n${lines.join('\n')}`;
+    }).join('\n\n');
+  }
+  function cloneWorkflowForRow(row){
+    const source=row&&row.wfData||{},wf=Object.assign({},source);
+    ['rolesReqList','rolesReqFromName','rolesBlkList','rolesNoCommentList','_rawReviewTexts'].forEach(k=>{if(Array.isArray(source[k]))wf[k]=source[k].slice();});
+    wf.roleActivity={};
+    wf.comments=''; // empêche le recalcul legacy depuis un commentaire partagé au niveau WF
+    wf._seenRows=true;
+    wf._hasRoleActivity=false;
+    wf._v215StrictPerDocument=false;wf._v222RoleScope='review-round';
+    row.wfData=wf;return wf;
+  }
+  function refreshRow(row,idx){
+    if(!row||!row.wfData)return false;
+    const wf=cloneWorkflowForRow(row),ctx=rowContext(row,idx),statusResolution=currentRoundStatusResolution(row,wf,ctx),allowed=activeRoles(row,wf),allAllowed=requiredRoles(row,wf,true),ambiguities=[],signals=[];
+
+    // V223 : identifier l'entreprise initiatrice depuis le créateur réel de la revue ACC.
+    // Cela rend le blocage "retourné chez l'initiateur" indépendant d'une liste de lots codée en dur.
+    if(ctx&&ctx.meta&&ctx.meta.createdBy){
+      try{
+        const initiatorName=resolveAuthor(ctx.meta.createdBy),initiatorMember=findMember(ctx.meta.createdBy,initiatorName);
+        const initiatorCompany=initiatorMember?clean(initiatorMember.companyShort||initiatorMember.company):'';
+        // L'appartenance à TPF Engineering provient de la fiche membre importée ;
+        // le numéro de lot n'est pas une preuve d'appartenance à une entreprise EN.
+        wf._v227MogTpfInitiator=!!initiatorCompany&&/\bTPF(?:E|S|T)?\b/i.test(initiatorCompany);
+        if(wf._v227MogTpfInitiator){
+          wf._v223InitiatorCompany='';
+        }else if(initiatorCompany){
+          const lot=typeof extractWorkflowLotCode==='function'?extractWorkflowLotCode(wf.wfName||wf.name||''):'';
+          const expected=lot?'EN'+lot:'';
+          const attributed=clean(initiatorMember&&initiatorMember.roles).split(',').map(x=>clean(x).match(/^(EN\d+(?:[._]\d+)?)\s*[_-]/i)).filter(Boolean).map(m=>m[1].replace('_','.').toUpperCase());
+          const matched=attributed.find(code=>code===expected);
+          wf._v223InitiatorCompany=(matched||expected)?`${matched||expected} - ${initiatorCompany}`:initiatorCompany;
+        }
+      }catch(e){}
+    }
+
+    // Un commentaire documentaire satisfait le rôle pour le fichier commenté.
+    // La note de progression, elle, porte sur le WF et conserve sa portée WF.
+    const onlyDocumentOfReview=!!ctx.reviewId&&(idx.docsByReview.get(key(ctx.reviewId))||[]).length===1;
+    const roleComments=ctx.exactDocument?ctx.comments:(onlyDocumentOfReview?ctx.reviewComments:[]);
+    const activeComments=roleComments.filter(c=>isSameRound(c.round,ctx.activeRound));
+    if(ctx.exactDocument||onlyDocumentOfReview){
+      activeComments.forEach(c=>{
+        const participation=participationFor(ctx,idx,c.authorId),info=resolveContribution(c.authorId,'',c.text,row,wf,contributionRoles(participation,row,wf,allowed));
+        if(!contributionEligible(participation,info,row,wf))return;
+        if(info.ambiguous)ambiguities.push(`${info.name} : ${info.mapped.join(', ')}`);register(wf,info.roles,info.member,true);
+      });
+    }else{
+      // Secours strict : uniquement les champs déjà attachés à CETTE ligne fichier.
+      applyFormattedText(clean(row.extractedComments),row,wf,allowed,'commentaire',ambiguities);
+      applyFormattedText(blockForRound(clean(row.extractedWfRoundsHistory),ctx.activeRound),row,wf,allowed,'historique',ambiguities);
+    }
+
+    // Notes de progression : niveau workflow, mais rôle de l'auteur et round actif uniquement.
+    if(ctx.notes.length){
+      ctx.notes.forEach(n=>{
+        const sameAuthorRound=c=>key(c.authorId)===key(n.authorId)&&isSameRound(c.round,n.round);
+        const hasWorkflowComment=(ctx.reviewComments||ctx.comments).some(sameAuthorRound);
+        // Les rôles sont débloqués au niveau revue/round, mais le message de
+        // traçabilité répond à la situation du fichier affiché. Un commentaire
+        // sur un fichier frère ne doit pas masquer sa note ici.
+        const hasExactComment=ctx.exactDocument?ctx.comments.some(sameAuthorRound):hasWorkflowComment;
+        const commentedElsewhere=ctx.exactDocument&&!hasExactComment&&hasWorkflowComment;
+        const active=isSameRound(n.round,ctx.activeRound);
+        const participation=participationFor(ctx,idx,n.authorId);
+        // Le créateur du WF est l'initiateur : il ne fait pas partie des
+        // réviseurs obligatoires et n'apparaît pas dans les soumissions silencieuses.
+        if(participation.initiator)return;
+        const displayInfo=resolveContribution(n.authorId,'',n.note,row,wf,contributionRoles(participation,row,wf,allowed));
+        const activeInfo=active?displayInfo:Object.assign({},displayInfo,{roles:[]});
+        const mandatory=contributionEligible(participation,activeInfo,row,wf);
+        // Une note vide d'un membre identifié ou candidat est également une
+        // soumission à tracer, même si cet auteur n'est pas réviseur obligatoire.
+        // Sa présence ne débloque aucun rôle ; seuls les événements sans auteur
+        // identifiable ni participation fiable restent écartés.
+        if(!mandatory&&!displayInfo.member&&!participation.reviewer&&!participation.approver)return;
+        const signalInfo=Object.assign({},displayInfo,{activeRoles:activeInfo.roles});
+        const finalApproverCode=active&&finalStepActive(row,wf)&&participation.approver&&!participation.reviewer?finalRole(row,wf):'';
+        const finalApproverBlocking=!!finalApproverCode;
+        // Une note ACC vide est la preuve d'une soumission, y compris pour
+        // l'approbateur final. Un texte dans la note seul ne prouve pas cette soumission.
+        if(finalApproverBlocking&&!clean(n.note))register(wf,[finalApproverCode],activeInfo.member,false);
+        if(clean(n.note)){
+          if(active){if(activeInfo.ambiguous)ambiguities.push(`${activeInfo.name} : ${activeInfo.mapped.join(', ')}`);register(wf,activeInfo.roles,activeInfo.member,true);}
+          if(!hasExactComment)signals.push({kind:'progress-note',round:n.round,createdAt:n.createdAt,updatedAt:n.updatedAt,info:signalInfo,participation:participation,isActiveRound:active,commentedElsewhere,finalApproverCode,finalApproverBlocking,released:active&&activeInfo.roles.length>0,blockingRelevant:active&&activeInfo.roles.length>0,optionalReviewer:active&&activeInfo.roles.length===0&&(participation.reviewer||participation.approver||!!displayInfo.member)});
+        }else if(!hasExactComment){
+          if(active)register(wf,activeInfo.roles,activeInfo.member,false);
+          signals.push({kind:'silent-submission',round:n.round,createdAt:n.createdAt,updatedAt:n.updatedAt,info:signalInfo,participation:participation,isActiveRound:active,commentedElsewhere,finalApproverCode,finalApproverBlocking,released:active&&activeInfo.roles.length>0&&!finalApproverBlocking,blockingRelevant:active&&activeInfo.roles.length>0,optionalReviewer:active&&activeInfo.roles.length===0&&(participation.reviewer||participation.approver||!!displayInfo.member)});
+        }
+      });
+    }else{
+      const noteText=blockForRound(clean(row.extractedWfProgressNotes),ctx.activeRound);
+      if(noteText)applyFormattedText(noteText,row,wf,allowed,'note de progression',ambiguities);
+    }
+
+    const eligibility=blockingEligibility(row,wf);
+    if(!eligibility.eligible)signals.forEach(s=>{s.blockingExcluded=eligibility.reason;s.blockingRelevant=false;s.released=false;});
+    const legacySilentText=clean(row.extractedWfSilentSubmissions);
+    const strictSignalText=formatSignals(signals);
+    const signalText=mergeSilentSignalTexts(strictSignalText,legacySilentText);
+    row.extractedWfSilentSubmissions=signalText;wf.silentSubmissions=signalText;wf.silentSubmissionEvents=signals;
+    wf._v215ReviewId=ctx.reviewId;wf._v215ActiveRound=ctx.activeRound;wf._v215ExactDocument=ctx.exactDocument;
+    try{delete wf.__finalizedCacheKey;}catch(e){wf.__finalizedCacheKey='';}
+    try{finalizeWorkflowRoleInfo(wf);}catch(e){console.warn('[V222] Recalcul strict des rôles',e);}
+    if(!eligibility.eligible){
+      // Neutralisation au niveau de CETTE ligne fichier. Le WF peut rester ouvert
+      // pour d'autres documents, sans rendre à nouveau bloquant le fichier statué.
+      wf.rolesBlkList=[];wf.rolesBlkCalculated='';wf.rolesBlkDetails='';wf.rolesBlk='';
+      wf._v218BlockingEligible=false;wf._v218BlockingExclusionReason=eligibility.reason;wf._v219BlockingEligible=false;wf._v220BlockingEligible=false;
+    }else{
+      wf._v218BlockingEligible=true;wf._v218BlockingExclusionReason='';wf._v219BlockingEligible=true;wf._v220BlockingEligible=true;
+    }
+    try{row.extractedRolesReq=formatRoleListForOutput(wf.rolesReqCalculated||'');}catch(e){row.extractedRolesReq=wf.rolesReqCalculated||'';}
+    try{row.extractedRolesBlk=formatRoleListForOutput(wf.rolesBlkCalculated||'');}catch(e){row.extractedRolesBlk=wf.rolesBlkCalculated||'';}
+    row.extractedRolesReqDetails=wf.rolesReqDetails||'';row.extractedRolesBlkDetails=wf.rolesBlkDetails||'';
+    row.extractedRolesNoComment=wf.rolesNoCommentCalculated||'';row.extractedRolesNoCommentDetails=wf.rolesNoCommentDetails||'';
+    row.extractedFinalApprover=wf.apprCalculated||wf.finalApprover||row.extractedFinalApprover||'';
+    row.extractedRoleAnalysisStatus=(wf.roleAnalysisStatus||'')+` · V232 : commentaires documentaires évalués par fichier au round ${ctx.activeRound} ; toute soumission identifiée satisfait le rôle obligatoire même sans texte ; absence de commentaire conservée dans la colonne de traçabilité ; réviseurs facultatifs et approbateur final séparés des rôles obligatoires ; auteurs actifs dédupliqués`+(statusResolution.corrected?` · statut courant corrigé « ${statusResolution.original||'vide'} » → « ${statusResolution.resolved} » (${statusResolution.reason}; source : ${statusResolution.source})`:'')+(!eligibility.eligible?` · aucun rôle bloquant actuel (${eligibility.reason})`:'')+(ambiguities.length?` · ambiguïté(s) non déduite(s) : ${unique(ambiguities).join(' | ')}`:'');
+    wf.roleAnalysisStatus=row.extractedRoleAnalysisStatus;
+    return true;
+  }
+  function refreshRows(redraw){
+    const idx=buildStrictIndex();if(!idx)return 0;
+    const lists=[],seen=new Set();
+    try{if(typeof processedData!=='undefined'&&Array.isArray(processedData))lists.push(processedData);}catch(e){}
+    try{if(typeof filteredData!=='undefined'&&Array.isArray(filteredData))lists.push(filteredData);}catch(e){}
+    if(Array.isArray(window.processedData))lists.push(window.processedData);if(Array.isArray(window.filteredData))lists.push(window.filteredData);
+    let changed=0;lists.forEach(list=>list.forEach(row=>{if(!row||seen.has(row))return;seen.add(row);if(refreshRow(row,idx))changed++;}));
+    try{if(typeof window.v106RefreshRoleSelect==='function')window.v106RefreshRoleSelect();}catch(e){}
+    if(changed&&redraw){
+      if(window.__v106FilterBlockingRoles&&typeof window.applyFilters==='function'){try{window.applyFilters();}catch(e){console.warn('[V215] Refiltrage',e);}}
+      else{try{if(typeof renderTableData==='function')renderTableData();}catch(e){}try{if(typeof updateDashboard==='function')updateDashboard();}catch(e){}try{if(typeof updatePageDeGarde==='function')updatePageDeGarde();}catch(e){}}
+    }
+    window.__v215StrictRowsRefreshed=changed;return changed;
+  }
+  window.v215RefreshStrictRoleActivity=refreshRows;
+  window.__v215StrictRoleEngine={buildStrictIndex,rowContext,resolveContribution,currentRoundStatusResolution,refreshRow,refreshRows};
+
+  const baseSilent=window.v212RefreshSilentSubmissions;
+  if(typeof baseSilent==='function'&&!baseSilent.__v215Wrapped){
+    const wrapped=function(redraw){const result=baseSilent.apply(this,arguments);refreshRows(redraw!==false);return result;};
+    wrapped.__v215Wrapped=true;wrapped.__v215Original=baseSilent;window.v212RefreshSilentSubmissions=wrapped;
+  }
+  const baseProcess=window.processAllData||((typeof processAllData==='function')?processAllData:null);
+  if(false && typeof baseProcess==='function'&&!baseProcess.__v215Wrapped){
+    // V224-PERF : évite un second passage intégral après la génération.
+    const wrapped=async function(){const result=await baseProcess.apply(this,arguments);refreshRows(true);return result;};
+    wrapped.__v215Wrapped=true;wrapped.__v215Original=baseProcess;window.processAllData=wrapped;try{processAllData=wrapped;}catch(e){}
+  }
+  const baseMembers=window.extractMembersFrom2DArray||((typeof extractMembersFrom2DArray==='function')?extractMembersFrom2DArray:null);
+  if(typeof baseMembers==='function'&&!baseMembers.__v215Wrapped){
+    const wrapped=function(){const result=baseMembers.apply(this,arguments);setTimeout(()=>refreshRows(true),150);return result;};
+    wrapped.__v215Wrapped=true;wrapped.__v215Original=baseMembers;window.extractMembersFrom2DArray=wrapped;try{extractMembersFrom2DArray=wrapped;}catch(e){}
+  }
+  document.addEventListener('click',function(ev){const b=ev.target&&ev.target.closest?ev.target.closest('button'):null;if(!b)return;const oc=String(b.getAttribute('onclick')||'');if(/exportExeExcel|exportChantierExcel|exportACCArborescenceExcel|exportFilteredExeBpeChantierExcel/.test(oc))refreshRows(false);},true);
+
+  function versionUi(){window.__CFL_IMMO_DASHBOARD_VERSION__='V232';try{document.title='CFLImmo - Dashboard Documentaire - V232';}catch(e){}document.documentElement.setAttribute('data-dashboard-version','V232');}
+  versionUi();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{versionUi();setTimeout(()=>refreshRows(true),650);},{once:true});
+  [100,1600,4200,8500,12000].forEach(ms=>setTimeout(versionUi,ms));
+  console.info('[V222] COB(ARCH-STRU-TSPE) interprété en coordinateurs BIM spécifiques ; commentaires supprimés exclus et auteurs actifs dédupliqués ; participation des réviseurs calculée au niveau revue/round.');
+  console.info('[V224-PERF-RED] Explications rouges : collecte V212 exhaustive + calcul strict V215 fusionné sans doublons auteur/date/round.');
+})();
+</script>
+
+
+<script id="v224-blocking-filter-complete">
+(function(){
+  window.__CFL_IMMO_DASHBOARD_VERSION__='V232';
+  function tag(){
+    try{document.title='CFLImmo - Dashboard Documentaire - V232';}catch(e){}
+    try{document.documentElement.setAttribute('data-dashboard-version','V232');}catch(e){}
+    try{if(typeof window.v106RefreshRoleSelect==='function')window.v106RefreshRoleSelect();}catch(e){}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tag,350),{once:true});
+  else setTimeout(tag,100);
+  console.info('[V224] Rôles bloquants : uniquement rôles obligatoires du nom WF ; reviewers facultatifs jamais bloquants ; approbateur final bloquant uniquement à son étape active.');
+})();
+</script>
+
+<script id="v224-mandatory-vs-optional-guard">
+(function(){
+  'use strict';
+  function clean(v){return String(v==null?'':v).trim();}
+  function normRole(v){try{return normalizeRoleCode(v);}catch(e){return clean(v).toUpperCase();}}
+  function unique(a){const o=[];(a||[]).forEach(x=>{const v=normRole(x);if(v&&!o.includes(v))o.push(v);});return o;}
+  function strictDefinition(wf){
+    wf=wf||{};
+    let p={requiredRoles:[],finalApprover:''};
+    try{p=parseRolesFromWorkflowName(wf.wfName||wf.name||'')||p;}catch(e){}
+    return {required:unique(p.requiredRoles||[]),final:normRole(p.finalApprover||wf.finalApproverFromName||wf.finalApprover||wf.apprCalculated||wf.appr||'')};
+  }
+  function isTerminal(wf){
+    const s=[wf&&wf.globStat,wf&&wf.step].filter(Boolean).join(' ');
+    try{if(typeof isWorkflowClosedStatus==='function'&&isWorkflowClosedStatus(s))return true;}catch(e){}
+    try{if(typeof isWorkflowInvalidStatus==='function'&&isWorkflowInvalidStatus(s))return true;}catch(e){}
+    return false;
+  }
+  function returned(wf){try{return typeof isWorkflowWaitingForInitiator==='function'&&isWorkflowWaitingForInitiator(wf||{});}catch(e){return false;}}
+  function finalStage(wf){try{return typeof isWorkflowAtFinalApprovalStep==='function'&&isWorkflowAtFinalApprovalStep(wf||{});}catch(e){return false;}}
+  // V232 : une soumission identifiée suffit pour débloquer un rôle obligatoire.
+  // Le défaut de commentaire reste une anomalie de traçabilité, pas un blocage.
+  function responded(wf,role){try{return typeof wfActivityHasResponded==='function'&&wfActivityHasResponded(wf,role,true);}catch(e){return false;}}
+  function format(items){try{return formatRoleListForOutput(items);}catch(e){return (items||[]).join(', ');}}
+  function apply(row){
+    if(!row||!row.wfData)return false;
+    const wf=row.wfData,def=strictDefinition(wf);
+    wf.rolesReqList=def.required.slice();
+    wf.rolesReqCalculated=format(def.required);
+    row.extractedRolesReq=wf.rolesReqCalculated;
+    let blocked=[];
+    let eligible=true;try{if(typeof window.v218IsBlockingEligibleRow==='function')eligible=window.v218IsBlockingEligibleRow(row);}catch(e){}
+    if(isTerminal(wf)||!eligible)blocked=[];
+    else if(returned(wf)){
+      const mapped=clean(wf._v223InitiatorCompany);
+      const fallback=typeof getInitiatorCompanyFromWorkflowName==='function'?clean(getInitiatorCompanyFromWorkflowName(wf.wfName||wf.name||'')):'';
+      // MOG/TPF ne devient jamais EN par le simple numéro du lot, même si
+      // une ancienne attribution erronée reste chargée dans la ligne.
+      const mogTpf=wf._v227MogTpfInitiator||/\bTPF(?:E|S|T)?\b/i.test(mapped);
+      const company=/^EN\d/i.test(mapped)?mapped:(fallback||mapped||'Initiateur');
+      blocked=mogTpf?[]:[company];
+    }else{
+      blocked=def.required.filter(r=>!responded(wf,r));
+      // L'approbateur final ne devient bloquant qu'à l'étape finale active.
+      // L'approbateur final reste bloquant tant que sa soumission n'est pas
+      // constatée à l'étape finale du round actif.
+      if(finalStage(wf)&&def.final&&!responded(wf,def.final))blocked.push(def.final);
+    }
+    if(typeof uniqueBlockingItems==='function')blocked=uniqueBlockingItems(blocked);else blocked=Array.from(new Set(blocked));
+    wf.rolesBlkList=blocked;wf.rolesBlkCalculated=format(blocked);wf.rolesBlk=wf.rolesBlkCalculated;
+    row.extractedRolesBlk=wf.rolesBlkCalculated;
+    try{wf.rolesBlkDetails=blocked.length?blocked.map(formatBlockingItemTooltip).join('\n\n'):'';}catch(e){wf.rolesBlkDetails='';}
+    row.extractedRolesBlkDetails=wf.rolesBlkDetails||'';
+    // La soumission de l'approbateur final ne crée pas un rôle de revue.
+    const reqSet=new Set(def.required);
+    if(Array.isArray(wf.rolesNoCommentList)){
+      wf.rolesNoCommentList=wf.rolesNoCommentList.filter(r=>reqSet.has(normRole(r)));
+      wf.rolesNoCommentCalculated=wf.rolesNoCommentList.join(', ');
+      row.extractedRolesNoComment=wf.rolesNoCommentCalculated;
+    }
+    return true;
+  }
+  function refresh(redraw){
+    const seen=new Set(),lists=[];
+    try{if(typeof processedData!=='undefined'&&Array.isArray(processedData))lists.push(processedData);}catch(e){}
+    try{if(typeof filteredData!=='undefined'&&Array.isArray(filteredData))lists.push(filteredData);}catch(e){}
+    if(Array.isArray(window.processedData))lists.push(window.processedData);
+    if(Array.isArray(window.filteredData))lists.push(window.filteredData);
+    let n=0;lists.forEach(list=>list.forEach(row=>{if(row&&!seen.has(row)){seen.add(row);if(apply(row))n++;}}));
+    try{if(typeof window.v106RefreshRoleSelect==='function')window.v106RefreshRoleSelect();}catch(e){}
+    if(redraw&&n){try{if(typeof renderTableData==='function')renderTableData();}catch(e){}try{if(typeof updateDashboard==='function')updateDashboard();}catch(e){}try{if(typeof updatePageDeGarde==='function')updatePageDeGarde();}catch(e){}}
+    return n;
+  }
+  window.v224RefreshMandatoryVsOptional=refresh;
+  const base=window.processAllData||((typeof processAllData==='function')?processAllData:null);
+  if(false && typeof base==='function'&&!base.__v224Wrapped){
+    // V224-PERF : la garde obligatoire/facultatif est appelée avant l'affichage final.
+    const wrapped=async function(){const r=await base.apply(this,arguments);refresh(true);return r;};
+    wrapped.__v224Wrapped=true;wrapped.__v224Original=base;window.processAllData=wrapped;try{processAllData=wrapped;}catch(e){}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>refresh(true),950),{once:true});
+  else setTimeout(()=>refresh(true),250);
+  [1800,4500,9000].forEach(ms=>setTimeout(()=>refresh(false),ms));
+})();
+</script>
+
+<script id="v224-filter-enterprises-en-only">
+(function(){
+  console.info('[V224] Filtre Rôles bloquants : sous-section entreprises limitée strictement aux rôles EN...');
+})();
+</script>
+
+<script id="v224-performance-correspondences">
+(function(){
+  window.__V224_PERFORMANCE_PATCH__='correspondences-single-pass';
+  console.info('[V224-PERF] Correspondances WF et rôles : passages redondants supprimés, index Reviews mis en cache, lookup membres indexé.');
+})();
+</script>
+
+
+<script id="v233-restore-blocking-graphs-and-stage">
+(function(){
+  'use strict';
+  window.__CFL_IMMO_DASHBOARD_VERSION__='V234';
+  const base=window.renderCharts;
+  function activeRows(){try{return Array.isArray(filteredData)?filteredData:[];}catch(e){return Array.isArray(window.filteredData)?window.filteredData:[];}}
+  function tokens(row){
+    if(typeof window.v218IsBlockingEligibleRow==='function'&&!window.v218IsBlockingEligibleRow(row))return [];
+    const wf=row&&row.wfData||{},raw=String(wf.rolesBlkCalculated||row.extractedRolesBlk||'');
+    return raw.split(/[,;|]+/).map(x=>x.trim()).filter(x=>x&&!/^[-–—]+$/.test(x));
+  }
+  function chart(id,data){
+    const canvas=document.getElementById(id);
+    if(!canvas||typeof Chart==='undefined')return;
+    if(window.__v233Charts&&window.__v233Charts[id])window.__v233Charts[id].destroy();
+    const entries=Object.entries(data).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'fr')).slice(0,25);
+    window.__v233Charts=window.__v233Charts||{};
+    window.__v233Charts[id]=new Chart(canvas.getContext('2d'),{type:'bar',data:{labels:entries.map(x=>x[0]),datasets:[{label:'Fichiers bloqués',data:entries.map(x=>x[1]),backgroundColor:'#f59e0b'}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}},y:{ticks:{autoSkip:false}}},onClick:(event,elements)=>{if(!elements.length)return;const value=entries[elements[0].index][0];window.__v106FilterBlockingRoles=true;window.__v106BlockingRoleValue=value;const select=document.getElementById('v106-blocking-role-select');if(select)select.value=value;if(typeof window.applyFilters==='function')window.applyFilters();}}});
+  }
+  window.renderCharts=function(){
+    if(typeof base==='function')base.apply(this,arguments);
+    const roles={},companies={};
+    activeRows().forEach(row=>tokens(row).forEach(role=>{const en=role.match(/^(EN\d+(?:[._]\d+)?)(?![\d.])/i);if(en){const code=en[1].replace('_','.').toUpperCase();companies[code]=(companies[code]||0)+1;}else{let code=role;try{code=normalizeRoleCode(role)||role;}catch(e){}roles[code]=(roles[code]||0)+1;}}));
+    chart('chartBlockingRoles',roles);chart('chartBlockingCompanies',companies);
+  };
+  try{renderCharts=window.renderCharts;}catch(e){}
+  function syncStage(){
+    let rows=[];try{rows=Array.isArray(processedData)?processedData:[];}catch(e){}
+    rows.forEach(row=>{if(!row||!row.wfData)return;const wf=row.wfData;const global=String(row.extractedWfGlobalStatus||wf.globStat||'');if(/invalid|caduc/i.test(global))return;const step=String(wf.step||wf.currentStepCalculated||row.extractedCurrentStep||'').trim();if(step)row.extractedCurrentStep=step;const state=window.canonicalWorkflowStatus&&window.canonicalWorkflowStatus(row);if(state==='Ouvert')row.extractedStatus='Revue en cours';if(state==='Retourné à l’initiateur')row.extractedStatus='Retourné chez l’initiateur';});
+  }
+  const original=window.processAllData;
+  if(typeof original==='function'){
+    const wrapped=async function(){const result=await original.apply(this,arguments);syncStage();try{window.v224RefreshMandatoryVsOptional(false);}catch(e){}try{window.v106RefreshRoleSelect();}catch(e){}try{window.applyFiltersNow();}catch(e){}return result;};
+    window.processAllData=wrapped;try{processAllData=wrapped;}catch(e){}
+  }
+  document.title='CFLImmo - Dashboard Documentaire - V234';
+  document.documentElement.setAttribute('data-dashboard-version','V234');
+})();
+</script>
 </body>
 </html>
