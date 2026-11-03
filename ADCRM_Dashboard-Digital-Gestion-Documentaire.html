@@ -2010,9 +2010,16 @@
             if (!s) return '';
             // Si ACC fournit un chemin complet dans la colonne fichier, on garde aussi le nom seul comme clé de matching.
             s = s.replace(/\\/g, '/').split('/').filter(Boolean).pop() || s;
-            // Certains exports concatènent le nom et des métadonnées ; on récupère le premier nom de fichier reconnaissable.
-            const m = s.match(/([^/\\\s]+\.(?:pdf|dwg|rvt|ifc|xlsx?|docx?|pptx?))/i);
+            // Le nom ACC peut contenir des espaces (ex. « Vase d'expansion Géothermie »).
+            // La première ligne contient le fichier ; les lignes suivantes peuvent contenir
+            // des métadonnées comme « Le dernier nom du fichier source est ... ».
+            const firstLine = s.split(/\r?\n/).map(line => line.trim()).find(Boolean) || s;
+            const m = firstLine.match(/^(.+?\.(?:pdf|dwg|rvt|ifc|xlsx?|docx?|pptx?))(?:\b|$)/i);
             if (m) s = m[1];
+            else {
+                const fallback = firstLine.match(/([^/\\\s]+\.(?:pdf|dwg|rvt|ifc|xlsx?|docx?|pptx?))/i);
+                if (fallback) s = fallback[1];
+            }
             return s.trim().toUpperCase();
         }
 
@@ -4038,7 +4045,8 @@
                     _hasRoleActivity: false,
                     _wfSourceHeaderRow: headerRowIdx + 1,
                     _wfSourceFileName: fileName,
-                    _wfSourceVersion: version
+                    _wfSourceVersion: version,
+                    _wfSourceCycle: getVal(row, colMap.cycle, r)
                 };
 
                 // Détection STRICTE des commentaires : seuls les noms/sociétés/rôles dans la colonne Commentaires retirent un rôle bloquant.
@@ -5538,7 +5546,10 @@
                             } else { content = '-'; }
                             filterVal = rolesReq; break;
                         case 'wfRolesBlk':
-                            if (rolesBlk && rolesBlk !== '-') {
+                            if (row._v238ReturnEvidenceUnknown) {
+                                const title = escapeHtml(row.extractedRoleAnalysisStatus || 'Date du renvoi non disponible dans les imports');
+                                content = `<span class="px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 text-[9px] font-bold" title="${title}">Rôles à vérifier après renvoi</span>`;
+                            } else if (rolesBlk && rolesBlk !== '-') {
                                 const title = escapeHtml(row.extractedRolesBlkDetails || row.extractedRoleAnalysisStatus || rolesBlk);
                                 content = `<div class="flex flex-wrap gap-1" title="${title}">${rolesBlk.split(',').map(x => x.trim()).filter(Boolean).map(code => `<span class="px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-[9px] font-bold">${escapeHtml(code)}</span>`).join('')}</div>`;
                             } else {
@@ -26944,6 +26955,7 @@ self.onmessage=async function(ev){
     const LINK_STYLE={font:{name:'Calibri',sz:10,color:{rgb:'0563C1'},underline:true},alignment:{vertical:'top',wrapText:true}};
     const OVERDUE_STYLE={font:{name:'Calibri',sz:10,color:{rgb:'9C0006'},bold:true},fill:{patternType:'solid',fgColor:{rgb:'FFC7CE'}},alignment:{vertical:'top',wrapText:true}};
     const SILENT_SUBMISSION_STYLE={font:{name:'Calibri',sz:10,color:{rgb:'9C0006'},bold:true},fill:{patternType:'solid',fgColor:{rgb:'FCE4D6'}},alignment:{vertical:'top',wrapText:true},numFmt:'@',quotePrefix:true};
+    const RETURN_UNVERIFIED_STYLE={font:{name:'Calibri',sz:10,color:{rgb:'7F6000'},bold:true},fill:{patternType:'solid',fgColor:{rgb:'FFF2CC'}},alignment:{vertical:'top',wrapText:true}};
     const HEADER_STYLE={font:{name:'Calibri',sz:10,bold:true,color:{rgb:'000000'}},fill:{patternType:'solid',fgColor:{rgb:'DDEBF7'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{bottom:{style:'medium',color:{rgb:'8EA9DB'}}}};
     const FORMULA_TEXT_GUARD='\u2060'; // caractère invisible : empêche Excel de convertir le texte en formule après édition
     const TITLE_STYLE={font:{name:'Calibri',sz:16,bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'000000'}},alignment:{vertical:'center',wrapText:true}};
@@ -27117,11 +27129,12 @@ self.onmessage=async function(ev){
             const values=(tpl&&Array.isArray(tpl.values)?tpl.values.slice(0,HEADERS.length):HEADERS.map(()=>''));
             while(values.length<HEADERS.length)values.push('');
             for(let c=0;c<values.length;c++)values[c]=clean(values[c]);
+            if(rows[i]&&rows[i]._v238ReturnEvidenceUnknown)values[18]='Rôles à vérifier après renvoi';
             const directFileUrl=clean(tpl&&(tpl.fileNameUrl||tpl.fileUrl));
             const fileUrl=clean(tpl&&(tpl.fileNameUrl||tpl.fileUrl||tpl.locationUrl));
             const wfUrl=clean(tpl&&tpl.workflowUrl);
             if(fileUrl)values[11]='Lien Data Management';
-            aoa.push(values);metas.push({fileUrl,nameUrl:directFileUrl||fileUrl,wfUrl,overdue:overdue(values),lines:maxTextLines(values)});
+            aoa.push(values);metas.push({fileUrl,nameUrl:directFileUrl||fileUrl,wfUrl,returnUnverified:!!(rows[i]&&rows[i]._v238ReturnEvidenceUnknown),overdue:overdue(values),lines:maxTextLines(values)});
             if((i+1)%chunk===0||i===rows.length-1){progress(`Préparation de la liste documentaire : ${(i+1).toLocaleString('fr-FR')} / ${rows.length.toLocaleString('fr-FR')}…`,12+Math.round(((i+1)/total)*48));await frame();}
         }
         progress('Création de la feuille Excel…',64);await frame();
@@ -27142,6 +27155,7 @@ self.onmessage=async function(ev){
             applyStatusStyle(ws,r,13,'file');
             applyStatusStyle(ws,r,14,'wf');
             const silentCell=cell(ws,r,10,false);if(silentCell&&clean(silentCell.v)){silentCell.s=SILENT_SUBMISSION_STYLE;}
+            if(m.returnUnverified){const ce=cell(ws,r,18,false);if(ce)ce.s=RETURN_UNVERIFIED_STYLE;}
             if(m.overdue){const ce=cell(ws,r,21,false);if(ce)ce.s=OVERDUE_STYLE;}
             if(m.lines>1)ws['!rows'][r]={hpt:Math.min(78,18+m.lines*12)};
             if((i+1)%700===0){progress(`Application des liens et contrôles : ${(i+1).toLocaleString('fr-FR')} / ${metas.length.toLocaleString('fr-FR')}…`,65+Math.round(((i+1)/Math.max(1,metas.length))*12));await frame();}
@@ -28703,9 +28717,9 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
       raw.comments=canonicalReviewComments(raw.comments||[]);
       __v225CommentsRef=raw.comments;__v225CommentsLen=raw.comments.length;
     }
-    const __sig=['reviews','candidates','documents','comments','notes'].map(k=>Array.isArray(raw[k])?raw[k].length:0).join('|');
+    const __sig=['reviews','candidates','documents','comments','notes','tasks'].map(k=>Array.isArray(raw[k])?raw[k].length:0).join('|');
     if(raw===__v224StrictIdxRaw&&__sig===__v224StrictIdxSig&&__v224StrictIdxCache)return __v224StrictIdxCache;
-    const reviewsById=new Map(),reviewsBySequence=new Map(),commentsByDoc=new Map(),commentsByReview=new Map(),notesByReview=new Map(),docsByEntity=new Map(),docsByReview=new Map(),reviewByDoc=new Map(),candidateStepsByReviewAuthor=new Map(),candidateStepsByInstanceAuthor=new Map();
+    const reviewsById=new Map(),reviewsBySequence=new Map(),commentsByDoc=new Map(),commentsByReview=new Map(),notesByReview=new Map(),tasksByReview=new Map(),docsByEntity=new Map(),docsByReview=new Map(),reviewByDoc=new Map(),candidateStepsByReviewAuthor=new Map(),candidateStepsByInstanceAuthor=new Map();
     (raw.reviews||[]).forEach(r=>{
       const id=key(cell(r,['id']));if(!id)return;
       const meta={id:cell(r,['id']),sequenceId:workflowNumber(cell(r,['sequence_id'])),currentRound:roundValue(cell(r,['current_round_num'])||'1'),status:cell(r,['status']),instanceId:cell(r,['instance_id']),createdBy:cell(r,['created_by']),currentStep:cell(r,['current_step']),totalSteps:cell(r,['total_steps'])};
@@ -28717,6 +28731,13 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
       if(!author||!step)return;
       if(reviewId){const k=`${reviewId}¦${author}`;if(!candidateStepsByReviewAuthor.has(k))candidateStepsByReviewAuthor.set(k,new Set());candidateStepsByReviewAuthor.get(k).add(step);}
       if(instance){const k=`${instance}¦${author}`;if(!candidateStepsByInstanceAuthor.has(k))candidateStepsByInstanceAuthor.set(k,new Set());candidateStepsByInstanceAuthor.get(k).add(step);}
+    });
+    // Les tâches de ce nouveau Data Connector portent directement review_id.
+    // Ne jamais joindre par step_id seul : il est réutilisé par plusieurs revues.
+    (raw.tasks||[]).forEach(r=>{
+      const reviewId=key(cell(r,['review_id']));if(!reviewId)return;
+      if(!tasksByReview.has(reviewId))tasksByReview.set(reviewId,[]);
+      tasksByReview.get(reviewId).push({stepId:cell(r,['step_id']),name:cell(r,['name']),assignee:cell(r,['assignee']),state:cell(r,['state']),createdAt:cell(r,['created_at']),updatedAt:cell(r,['updated_at'])});
     });
 
     // Indexer les documents avant les commentaires afin de rattacher chaque contribution à sa revue.
@@ -28750,7 +28771,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
       if(!notesByReview.has(reviewId))notesByReview.set(reviewId,[]);
       notesByReview.get(reviewId).push({reviewId,authorId,note,round,createdAt:cell(r,['created_at']),updatedAt:cell(r,['updated_at'])});
     });
-    const idx={reviewsById,reviewsBySequence,commentsByDoc,commentsByReview,notesByReview,docsByEntity,docsByReview,reviewByDoc,candidateStepsByReviewAuthor,candidateStepsByInstanceAuthor};
+    const idx={reviewsById,reviewsBySequence,commentsByDoc,commentsByReview,notesByReview,tasksByReview,docsByEntity,docsByReview,reviewByDoc,candidateStepsByReviewAuthor,candidateStepsByInstanceAuthor};
     window.__v215StrictIndex=idx;
     __v224StrictIdxRaw=raw;__v224StrictIdxSig=__sig;__v224StrictIdxCache=idx;
     return idx;
@@ -28798,7 +28819,31 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     // du même WF correspond à un document frère sans commentaire propre.
     const reviewComments=reviewId?(idx.commentsByReview.get(reviewId)||[]):comments;
     const notes=reviewId?(idx.notesByReview.get(reviewId)||[]):[];
-    return {history,reviewId,meta,docs,comments,reviewComments,notes,activeRound,exactDocument:docs.length>0};
+    const tasks=reviewId?(idx.tasksByReview.get(reviewId)||[]):[];
+    return {history,reviewId,meta,docs,comments,reviewComments,notes,tasks,activeRound,exactDocument:docs.length>0};
+  }
+
+  function reopenedStepAt(ctx,wf){
+    const step=clean(wf&&wf.step);
+    if(!/renvoyé\s+à\s+partir\s+de\s+l['’]étape/i.test(step))return '';
+    const label=clean(step.split(/\n/).slice(1).join(' ')).replace(/\s*\(Renvoyé\s+à\s+partir\s+de.*$/i,'').trim();
+    if(!label||!ctx||!ctx.tasks||!ctx.tasks.length)return '';
+    const same=ctx.tasks.filter(t=>norm(t.name)===norm(label)&&clean(t.createdAt));
+    if(!same.length)return '';
+    const groups=new Map();same.forEach(t=>{const k=clean(t.createdAt).slice(0,16);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(t);});
+    const times=Array.from(groups.keys()).sort();if(times.length<2)return '';
+    const first=times[0],last=times[times.length-1];
+    // Une tâche finale entre les deux cohortes confirme le trajet initiale → finale → initiale.
+    const interveningFinal=ctx.tasks.some(t=>norm(t.name)!==norm(label)&&clean(t.createdAt)>first&&clean(t.createdAt)<last);
+    const firstSize=groups.get(first).length,lastSize=groups.get(last).length;
+    if(!interveningFinal||lastSize<Math.max(1,Math.ceil(firstSize*0.5)))return '';
+    return groups.get(last).map(t=>clean(t.createdAt)).sort()[0];
+  }
+  function reportDay(value){
+    const s=clean(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\./g,''),m=s.match(/(\d{1,2})\s+([a-z]+)\s+(\d{4})\s+\d{1,2}:\d{2}/);
+    if(!m)return '';
+    const months={janv:1,janvier:1,fevr:2,fevrier:2,mars:3,avr:4,avril:4,mai:5,juin:6,juil:7,juillet:7,aout:8,sept:9,septembre:9,oct:10,octobre:10,nov:11,novembre:11,dec:12,decembre:12};
+    const month=months[m[2]];return month?`${m[3]}-${String(month).padStart(2,'0')}-${m[1].padStart(2,'0')}`:'';
   }
 
   function blockForRound(text,round){
@@ -28810,10 +28855,10 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     return '';
   }
   function textEntries(text){
-    try{if(typeof v58ExtractCommentAuthors==='function'){const a=v58ExtractCommentAuthors(text);if(a&&a.length)return a.map(e=>({author:e.author,body:e.body||''}));}}catch(e){}
-    const out=[],lines=String(text||'').split(/\r?\n/),marker=/^\s*-?\s*([^(:\n]{2,100}?)\s*\([^)]{4,100}\)\s*:\s*(.*)$/;let current=null;
+    const out=[],lines=String(text||'').split(/\r?\n/),marker=/^\s*-?\s*([^(:\n]{2,100}?)\s*\(([^)]{4,100})\)\s*:\s*(.*)$/;let current=null;
     const flush=()=>{if(current){current.body=current.parts.join('\n').trim();out.push(current);}};
-    lines.forEach(line=>{const m=line.match(marker);if(m){flush();current={author:m[1].trim(),parts:[m[2]||'']};}else if(current)current.parts.push(line);});flush();
+    lines.forEach(line=>{const m=line.match(marker);if(m){flush();current={author:m[1].trim(),dateText:m[2],parts:[m[3]||'']};}else if(current)current.parts.push(line);});flush();
+    if(!out.length){try{if(typeof v58ExtractCommentAuthors==='function'){const a=v58ExtractCommentAuthors(text);if(a&&a.length)return a.map(e=>({author:e.author,body:e.body||'',dateText:''}));}}catch(e){}}
     return out;
   }
   function register(wf,roles,member,commented){
@@ -28857,7 +28902,11 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
           :(clean(e.info&&e.info.memberRoleLabel)||(e.info&&e.info.ambiguous?'rôle ambigu à contrôler':'rôle à identifier'));
         const attribution=[roles,company].filter(Boolean).join(' / ');
         let observation='';
-        if(e.blockingExcluded){
+        if(e.previousStepInstance){
+          observation=(e.kind==='progress-note'?'Note de progression renseignée':'Soumis sans commentaire')+' · avant le retour à cette étape · traçabilité uniquement';
+        }else if(e.returnResetUnverified){
+          observation=(e.kind==='progress-note'?'Note de progression renseignée':'Soumis sans commentaire')+' · effet sur l’étape réouverte indéterminé : date du renvoi absente des imports · traçabilité';
+        }else if(e.blockingExcluded){
           observation=(e.kind==='progress-note'?'Note de progression renseignée sans commentaire documentaire':'Soumis sans commentaire')+` · non retenu comme blocage actuel (${e.blockingExcluded}) · traçabilité`;
         }else if(!e.isActiveRound){
           observation=(e.kind==='progress-note'?'Note de progression renseignée sans commentaire documentaire':'Soumis sans commentaire')+' · round antérieur (traçabilité uniquement)';
@@ -28909,6 +28958,9 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   function cloneWorkflowForRow(row){
     const source=row&&row.wfData||{},wf=Object.assign({},source);
     ['rolesReqList','rolesReqFromName','rolesBlkList','rolesNoCommentList','_rawReviewTexts'].forEach(k=>{if(Array.isArray(source[k]))wf[k]=source[k].slice();});
+    // Le calcul strict vide « comments » pour éviter un commentaire partagé entre
+    // fichiers. Garder séparément ceux du fichier exact dans le rapport Excel ACC.
+    wf._wfReportComments=clean(source._wfReportComments||source.comments);
     wf.roleActivity={};
     wf.comments=''; // empêche le recalcul legacy depuis un commentaire partagé au niveau WF
     wf._seenRows=true;
@@ -28919,6 +28971,8 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
   function refreshRow(row,idx){
     if(!row||!row.wfData)return false;
     const wf=cloneWorkflowForRow(row),ctx=rowContext(row,idx),statusResolution=currentRoundStatusResolution(row,wf,ctx),allowed=activeRoles(row,wf),allAllowed=requiredRoles(row,wf,true),ambiguities=[],signals=[];
+    const returnEpoch=reopenedStepAt(ctx,wf);
+    const afterReturn=date=>!returnEpoch||!!clean(date)&&clean(date)>=returnEpoch;
 
     // V223 : identifier l'entreprise initiatrice depuis le créateur réel de la revue ACC.
     // Cela rend le blocage "retourné chez l'initiateur" indépendant d'une liste de lots codée en dur.
@@ -28945,13 +28999,39 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     // La note de progression, elle, porte sur le WF et conserve sa portée WF.
     const onlyDocumentOfReview=!!ctx.reviewId&&(idx.docsByReview.get(key(ctx.reviewId))||[]).length===1;
     const roleComments=ctx.exactDocument?ctx.comments:(onlyDocumentOfReview?ctx.reviewComments:[]);
-    const activeComments=roleComments.filter(c=>isSameRound(c.round,ctx.activeRound));
+    const activeComments=roleComments.filter(c=>isSameRound(c.round,ctx.activeRound)&&afterReturn(c.createdAt));
     if(ctx.exactDocument||onlyDocumentOfReview){
       activeComments.forEach(c=>{
         const participation=participationFor(ctx,idx,c.authorId),info=resolveContribution(c.authorId,'',c.text,row,wf,contributionRoles(participation,row,wf,allowed));
         if(!contributionEligible(participation,info,row,wf))return;
         if(info.ambiguous)ambiguities.push(`${info.name} : ${info.mapped.join(', ')}`);register(wf,info.roles,info.member,true);
       });
+      // Les exports CSV peuvent précéder le rapport Excel ACC. Compléter les
+      // auteurs manquants uniquement depuis les commentaires du fichier exact,
+      // au cycle actif. Les notes CSV conservent leur traçabilité même si le
+      // même auteur ajoute ensuite un commentaire dans le rapport Excel.
+      const sourceName=clean(wf._wfSourceFileName),rowName=clean(row.extractedNom);
+      const sameSourceFile=sourceName&&rowName&&typeof extractFileBaseName==='function'
+        &&extractFileBaseName(sourceName)===extractFileBaseName(rowName);
+      const sourceCycle=clean(wf._wfSourceCycle);
+      if((ctx.exactDocument||onlyDocumentOfReview)&&sameSourceFile&&sourceCycle&&roundValue(sourceCycle)===roundValue(ctx.activeRound)&&wf._wfReportComments){
+        const seenAuthors=new Set(activeComments.map(c=>norm(resolveAuthor(c.authorId))));
+        const added=new Set();
+        textEntries(wf._wfReportComments).forEach(e=>{
+          const author=norm(e.author);
+          if(!author||seenAuthors.has(author)||added.has(author)||!clean(e.body))return;
+          // Le rapport Excel cumule les commentaires de toutes les traversées
+          // d'un même round. Après un retour, sa date doit prouver que le
+          // commentaire appartient à la nouvelle traversée.
+          if(returnEpoch){const day=reportDay(e.dateText);if(!day||day<=returnEpoch.slice(0,10))return;}
+          const info=resolveContribution('',e.author,e.body,row,wf,allowed);
+          if(!info.member||!info.roles.length)return;
+          if(info.ambiguous){ambiguities.push(`${info.name} : ${info.mapped.join(', ')}`);return;}
+          register(wf,info.roles,info.member,true);
+          added.add(author);
+        });
+        if(added.size)wf._v237ExcelCommentAuthors=Array.from(added);
+      }
     }else{
       // Secours strict : uniquement les champs déjà attachés à CETTE ligne fichier.
       applyFormattedText(clean(row.extractedComments),row,wf,allowed,'commentaire',ambiguities);
@@ -28962,13 +29042,14 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     if(ctx.notes.length){
       ctx.notes.forEach(n=>{
         const sameAuthorRound=c=>key(c.authorId)===key(n.authorId)&&isSameRound(c.round,n.round);
-        const hasWorkflowComment=(ctx.reviewComments||ctx.comments).some(sameAuthorRound);
+        const sameStepInstance=c=>!returnEpoch||afterReturn(c.createdAt)===afterReturn(n.createdAt);
+        const hasWorkflowComment=(ctx.reviewComments||ctx.comments).some(c=>sameAuthorRound(c)&&sameStepInstance(c));
         // Les rôles sont débloqués au niveau revue/round, mais le message de
         // traçabilité répond à la situation du fichier affiché. Un commentaire
         // sur un fichier frère ne doit pas masquer sa note ici.
-        const hasExactComment=ctx.exactDocument?ctx.comments.some(sameAuthorRound):hasWorkflowComment;
+        const hasExactComment=ctx.exactDocument?ctx.comments.some(c=>sameAuthorRound(c)&&sameStepInstance(c)):hasWorkflowComment;
         const commentedElsewhere=ctx.exactDocument&&!hasExactComment&&hasWorkflowComment;
-        const active=isSameRound(n.round,ctx.activeRound);
+        const sameRound=isSameRound(n.round,ctx.activeRound),active=sameRound&&afterReturn(n.createdAt);
         const participation=participationFor(ctx,idx,n.authorId);
         // Le créateur du WF est l'initiateur : il ne fait pas partie des
         // réviseurs obligatoires et n'apparaît pas dans les soumissions silencieuses.
@@ -28989,10 +29070,10 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
         if(finalApproverBlocking&&!clean(n.note))register(wf,[finalApproverCode],activeInfo.member,false);
         if(clean(n.note)){
           if(active){if(activeInfo.ambiguous)ambiguities.push(`${activeInfo.name} : ${activeInfo.mapped.join(', ')}`);register(wf,activeInfo.roles,activeInfo.member,true);}
-          if(!hasExactComment)signals.push({kind:'progress-note',round:n.round,createdAt:n.createdAt,updatedAt:n.updatedAt,info:signalInfo,participation:participation,isActiveRound:active,commentedElsewhere,finalApproverCode,finalApproverBlocking,released:active&&activeInfo.roles.length>0,blockingRelevant:active&&activeInfo.roles.length>0,optionalReviewer:active&&activeInfo.roles.length===0&&(participation.reviewer||participation.approver||!!displayInfo.member)});
+          if(!hasExactComment)signals.push({kind:'progress-note',round:n.round,createdAt:n.createdAt,updatedAt:n.updatedAt,info:signalInfo,participation:participation,isActiveRound:active,previousStepInstance:sameRound&&!active&&!!returnEpoch,commentedElsewhere,finalApproverCode,finalApproverBlocking,released:active&&activeInfo.roles.length>0,blockingRelevant:active&&activeInfo.roles.length>0,optionalReviewer:active&&activeInfo.roles.length===0&&(participation.reviewer||participation.approver||!!displayInfo.member)});
         }else if(!hasExactComment){
           if(active)register(wf,activeInfo.roles,activeInfo.member,false);
-          signals.push({kind:'silent-submission',round:n.round,createdAt:n.createdAt,updatedAt:n.updatedAt,info:signalInfo,participation:participation,isActiveRound:active,commentedElsewhere,finalApproverCode,finalApproverBlocking,released:active&&activeInfo.roles.length>0&&!finalApproverBlocking,blockingRelevant:active&&activeInfo.roles.length>0,optionalReviewer:active&&activeInfo.roles.length===0&&(participation.reviewer||participation.approver||!!displayInfo.member)});
+          signals.push({kind:'silent-submission',round:n.round,createdAt:n.createdAt,updatedAt:n.updatedAt,info:signalInfo,participation:participation,isActiveRound:active,previousStepInstance:sameRound&&!active&&!!returnEpoch,commentedElsewhere,finalApproverCode,finalApproverBlocking,released:active&&activeInfo.roles.length>0&&!finalApproverBlocking,blockingRelevant:active&&activeInfo.roles.length>0,optionalReviewer:active&&activeInfo.roles.length===0&&(participation.reviewer||participation.approver||!!displayInfo.member)});
         }
       });
     }else{
@@ -29000,7 +29081,38 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
       if(noteText)applyFormattedText(noteText,row,wf,allowed,'note de progression',ambiguities);
     }
 
+    // Une tâche soumise après la réouverture prouve la participation même
+    // lorsqu'ACC n'a produit ni commentaire documentaire ni note de progression.
+    // review_id + étape + cohorte de création évitent de confondre avec la
+    // soumission de la première traversée du même round.
+    if(returnEpoch){
+      const stepName=clean(wf.step).split(/\n/).slice(1).join(' ').replace(/\s*\(Renvoyé\s+à\s+partir\s+de.*$/i,'').trim();
+      const excelAuthors=new Set((wf._v237ExcelCommentAuthors||[]).map(norm));
+      const seenTasks=new Set();
+      (ctx.tasks||[]).forEach(t=>{
+        const id=key(t.assignee);
+        if(!id||seenTasks.has(id)||norm(t.state)!=='SUBMITTED'||norm(t.name)!==norm(stepName)||!afterReturn(t.createdAt))return;
+        seenTasks.add(id);
+        const participation=participationFor(ctx,idx,t.assignee),info=resolveContribution(t.assignee,'','',row,wf,contributionRoles(participation,row,wf,allowed));
+        if(!contributionEligible(participation,info,row,wf))return;
+        const commented=activeComments.some(c=>key(c.authorId)===id)||excelAuthors.has(norm(resolveAuthor(t.assignee)));
+        register(wf,info.roles,info.member,commented);
+        if(commented||(ctx.notes||[]).some(n=>key(n.authorId)===id&&afterReturn(n.createdAt)&&isSameRound(n.round,ctx.activeRound)))return;
+        signals.push({kind:'silent-submission',round:ctx.activeRound,createdAt:t.updatedAt||t.createdAt,info,participation,isActiveRound:true,released:true,blockingRelevant:true,optionalReviewer:false});
+      });
+    }
+
     const eligibility=blockingEligibility(row,wf);
+    // Un renvoi à une étape précédente peut avoir lieu au sein du même round.
+    // Ni le numéro du cycle ni les commentaires cumulés du rapport ne datent le
+    // renvoi : ne jamais présenter leurs anciennes soumissions comme une preuve
+    // que tous les réviseurs ont répondu à l'étape réouverte.
+    const returnEvidenceUnknown=eligibility.eligible
+      &&/renvoyé\s+à\s+partir\s+de\s+l['’]étape/i.test(clean(wf.step||''))
+      &&roundValue(clean(wf._wfSourceCycle)||ctx.activeRound)===roundValue(ctx.activeRound)&&!returnEpoch;
+    row._v238ReturnEvidenceUnknown=!!returnEvidenceUnknown;
+    wf._v238ReturnEvidenceUnknown=!!returnEvidenceUnknown;
+    if(returnEvidenceUnknown)signals.forEach(s=>{s.returnResetUnverified=true;s.released=false;});
     if(!eligibility.eligible)signals.forEach(s=>{s.blockingExcluded=eligibility.reason;s.blockingRelevant=false;s.released=false;});
     const legacySilentText=clean(row.extractedWfSilentSubmissions);
     const strictSignalText=formatSignals(signals);
@@ -29022,7 +29134,7 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     row.extractedRolesReqDetails=wf.rolesReqDetails||'';row.extractedRolesBlkDetails=wf.rolesBlkDetails||'';
     row.extractedRolesNoComment=wf.rolesNoCommentCalculated||'';row.extractedRolesNoCommentDetails=wf.rolesNoCommentDetails||'';
     row.extractedFinalApprover=wf.apprCalculated||wf.finalApprover||row.extractedFinalApprover||'';
-    row.extractedRoleAnalysisStatus=(wf.roleAnalysisStatus||'')+` · V232 : commentaires documentaires évalués par fichier au round ${ctx.activeRound} ; toute soumission identifiée satisfait le rôle obligatoire même sans texte ; absence de commentaire conservée dans la colonne de traçabilité ; réviseurs facultatifs et approbateur final séparés des rôles obligatoires ; auteurs actifs dédupliqués`+(statusResolution.corrected?` · statut courant corrigé « ${statusResolution.original||'vide'} » → « ${statusResolution.resolved} » (${statusResolution.reason}; source : ${statusResolution.source})`:'')+(!eligibility.eligible?` · aucun rôle bloquant actuel (${eligibility.reason})`:'')+(ambiguities.length?` · ambiguïté(s) non déduite(s) : ${unique(ambiguities).join(' | ')}`:'');
+    row.extractedRoleAnalysisStatus=(wf.roleAnalysisStatus||'')+` · V239 : commentaires documentaires évalués par fichier et par traversée de l'étape au round ${ctx.activeRound} ; toute soumission identifiée satisfait le rôle obligatoire même sans texte ; absence de commentaire conservée dans la colonne de traçabilité ; réviseurs facultatifs et approbateur final séparés des rôles obligatoires ; auteurs actifs dédupliqués`+(returnEpoch?` · étape réouverte le ${returnEpoch} (reviews_review_tasks.review_id + tâche de l'étape) ; contributions antérieures exclues du blocage actuel`:'')+(wf._v237ExcelCommentAuthors&&wf._v237ExcelCommentAuthors.length?` · commentaires complémentaires du rapport Excel ACC pour ce fichier et ce cycle : ${wf._v237ExcelCommentAuthors.join(', ')}`:'')+(returnEvidenceUnknown?' · ATTENTION : revue renvoyée à une étape précédente dans le même round ; la date du renvoi est absente des imports. Les commentaires et soumissions cumulés ne permettent pas de confirmer quels rôles ont répondu après le renvoi. Rôles bloquants indéterminés pour cette étape.':'')+(statusResolution.corrected?` · statut courant corrigé « ${statusResolution.original||'vide'} » → « ${statusResolution.resolved} » (${statusResolution.reason}; source : ${statusResolution.source})`:'')+(!eligibility.eligible?` · aucun rôle bloquant actuel (${eligibility.reason})`:'')+(ambiguities.length?` · ambiguïté(s) non déduite(s) : ${unique(ambiguities).join(' | ')}`:'');
     wf.roleAnalysisStatus=row.extractedRoleAnalysisStatus;
     return true;
   }
@@ -29188,10 +29300,11 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
 <script id="v233-restore-blocking-graphs-and-stage">
 (function(){
   'use strict';
-  window.__CFL_IMMO_DASHBOARD_VERSION__='V235';
+  window.__CFL_IMMO_DASHBOARD_VERSION__='V239';
   const base=window.renderCharts;
   function activeRows(){try{return Array.isArray(filteredData)?filteredData:[];}catch(e){return Array.isArray(window.filteredData)?window.filteredData:[];}}
   function tokens(row){
+    if(row&&row._v238ReturnEvidenceUnknown)return [];
     if(typeof window.v218IsBlockingEligibleRow==='function'&&!window.v218IsBlockingEligibleRow(row))return [];
     const wf=row&&row.wfData||{},raw=String(wf.rolesBlkCalculated||row.extractedRolesBlk||'');
     return raw.split(/[,;|]+/).map(x=>x.trim()).filter(x=>x&&!/^[-–—]+$/.test(x));
@@ -29220,8 +29333,8 @@ self.onmessage=async function(ev){const d=ev.data||{};try{if(!ready){importScrip
     const wrapped=async function(){const result=await original.apply(this,arguments);syncStage();try{window.v224RefreshMandatoryVsOptional(false);}catch(e){}try{window.v106RefreshRoleSelect();}catch(e){}try{window.applyFiltersNow();}catch(e){}return result;};
     window.processAllData=wrapped;try{processAllData=wrapped;}catch(e){}
   }
-  document.title='CFLImmo - Dashboard Documentaire - V235';
-  document.documentElement.setAttribute('data-dashboard-version','V235');
+  document.title='CFLImmo - Dashboard Documentaire - V239';
+  document.documentElement.setAttribute('data-dashboard-version','V239');
 })();
 </script>
 </body>
